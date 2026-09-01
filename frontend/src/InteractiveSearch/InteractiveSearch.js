@@ -1,7 +1,9 @@
 import PropTypes from 'prop-types';
-import React from 'react';
+import React, { useState } from 'react';
 import Alert from 'Components/Alert';
+import TextInput from 'Components/Form/TextInput';
 import Icon from 'Components/Icon';
+import Button from 'Components/Link/Button';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import Table from 'Components/Table/Table';
 import TableBody from 'Components/Table/TableBody';
@@ -92,6 +94,7 @@ const columns = [
 
 function InteractiveSearch(props) {
   const {
+    type,
     searchPayload,
     isFetching,
     isPopulated,
@@ -103,11 +106,57 @@ function InteractiveSearch(props) {
     longDateFormat,
     timeFormat,
     onSortPress,
-    onGrabPress
+    onGrabPress,
+    dispatchFetchReleases
   } = props;
+
+  const [customTerm, setCustomTerm] = useState('');
+
+  const onCustomTermChange = ({ value }) => {
+    setCustomTerm(value);
+  };
+
+  const onCustomSearchSubmit = (event) => {
+    event.preventDefault();
+
+    if (customTerm.trim()) {
+      dispatchFetchReleases({
+        ...searchPayload,
+        term: customTerm
+      });
+    }
+  };
 
   return (
     <div>
+      {
+        // Interactive Search's default query is built from the book's own title/author
+        // metadata and can't be edited. When indexer release naming doesn't line up
+        // with that (or the match is simply wrong), this box lets you override the
+        // search term the indexers are actually queried with.
+        type === 'book' ?
+          <form
+            className={styles.customSearch}
+            onSubmit={onCustomSearchSubmit}
+          >
+            <TextInput
+              className={styles.customSearchInput}
+              placeholder={translate('SearchForCustomTerm')}
+              name="customTerm"
+              value={customTerm}
+              onChange={onCustomTermChange}
+            />
+
+            <Button
+              type="submit"
+              isDisabled={!customTerm.trim()}
+            >
+              {translate('Search')}
+            </Button>
+          </form> :
+          null
+      }
+
       {
         isFetching ? <LoadingIndicator /> : null
       }
@@ -188,7 +237,8 @@ InteractiveSearch.propTypes = {
   longDateFormat: PropTypes.string.isRequired,
   timeFormat: PropTypes.string.isRequired,
   onSortPress: PropTypes.func.isRequired,
-  onGrabPress: PropTypes.func.isRequired
+  onGrabPress: PropTypes.func.isRequired,
+  dispatchFetchReleases: PropTypes.func.isRequired
 };
 
 export default InteractiveSearch;

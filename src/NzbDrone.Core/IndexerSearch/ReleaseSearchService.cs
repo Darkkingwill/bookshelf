@@ -15,7 +15,7 @@ namespace NzbDrone.Core.IndexerSearch
 {
     public interface ISearchForReleases
     {
-        Task<List<DownloadDecision>> BookSearch(int bookId, bool missingOnly, bool userInvokedSearch, bool interactiveSearch);
+        Task<List<DownloadDecision>> BookSearch(int bookId, bool missingOnly, bool userInvokedSearch, bool interactiveSearch, string customTerm = null);
         Task<List<DownloadDecision>> AuthorSearch(int authorId, bool missingOnly, bool userInvokedSearch, bool interactiveSearch);
     }
 
@@ -40,13 +40,13 @@ namespace NzbDrone.Core.IndexerSearch
             _logger = logger;
         }
 
-        public async Task<List<DownloadDecision>> BookSearch(int bookId, bool missingOnly, bool userInvokedSearch, bool interactiveSearch)
+        public async Task<List<DownloadDecision>> BookSearch(int bookId, bool missingOnly, bool userInvokedSearch, bool interactiveSearch, string customTerm = null)
         {
             var downloadDecisions = new List<DownloadDecision>();
 
             var book = _bookService.GetBook(bookId);
 
-            var decisions = await BookSearch(book, missingOnly, userInvokedSearch, interactiveSearch);
+            var decisions = await BookSearch(book, missingOnly, userInvokedSearch, interactiveSearch, customTerm);
             downloadDecisions.AddRange(decisions);
 
             return DeDupeDecisions(downloadDecisions);
@@ -76,7 +76,7 @@ namespace NzbDrone.Core.IndexerSearch
             return await Dispatch(indexer => indexer.Fetch(searchSpec), searchSpec);
         }
 
-        public async Task<List<DownloadDecision>> BookSearch(Book book, bool missingOnly, bool userInvokedSearch, bool interactiveSearch)
+        public async Task<List<DownloadDecision>> BookSearch(Book book, bool missingOnly, bool userInvokedSearch, bool interactiveSearch, string customTerm = null)
         {
             var author = _authorService.GetAuthor(book.AuthorId);
 
@@ -88,6 +88,15 @@ namespace NzbDrone.Core.IndexerSearch
             if (book.ReleaseDate.HasValue)
             {
                 searchSpec.BookYear = book.ReleaseDate.Value.Year;
+            }
+
+            // A user-supplied search term takes priority over the derived title/author query,
+            // for cases where indexer release naming doesn't match the book's metadata closely
+            // enough for the default query to find anything.
+            if (customTerm.IsNotNullOrWhiteSpace())
+            {
+                searchSpec.BookTitle = customTerm;
+                searchSpec.IsCustomTermSearch = true;
             }
 
             return await Dispatch(indexer => indexer.Fetch(searchSpec), searchSpec);

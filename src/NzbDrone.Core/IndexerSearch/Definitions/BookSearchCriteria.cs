@@ -9,7 +9,14 @@ namespace NzbDrone.Core.IndexerSearch.Definitions
         public string BookIsbn { get; set; }
         public string Disambiguation { get; set; }
 
-        public string BookQuery => GetQueryTitle(BookTitle.SplitBookTitle(Author.Name).Item1);
+        // When true, BookTitle holds a user-supplied search term (from Interactive Search's
+        // "Search for" box) and should be sent to indexers as close to verbatim as possible,
+        // rather than run through the title/subtitle-splitting heuristic meant for real book titles.
+        public bool IsCustomTermSearch { get; set; }
+
+        public string BookQuery => IsCustomTermSearch
+            ? GetQueryTitle(BookTitle)
+            : GetQueryTitle(BookTitle.SplitBookTitle(Author.Name).Item1);
 
         public override string ToString()
         {

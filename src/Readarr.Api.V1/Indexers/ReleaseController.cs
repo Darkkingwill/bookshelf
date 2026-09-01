@@ -136,11 +136,11 @@ namespace Readarr.Api.V1.Indexers
         }
 
         [HttpGet]
-        public async Task<List<ReleaseResource>> GetReleases(int? bookId, int? authorId)
+        public async Task<List<ReleaseResource>> GetReleases(int? bookId, int? authorId, string term)
         {
             if (bookId.HasValue)
             {
-                return await GetBookReleases(int.Parse(Request.Query["bookId"]));
+                return await GetBookReleases(int.Parse(Request.Query["bookId"]), term);
             }
 
             if (authorId.HasValue)
@@ -151,11 +151,11 @@ namespace Readarr.Api.V1.Indexers
             return await GetRss();
         }
 
-        private async Task<List<ReleaseResource>> GetBookReleases(int bookId)
+        private async Task<List<ReleaseResource>> GetBookReleases(int bookId, string term = null)
         {
             try
             {
-                var decisions = await _releaseSearchService.BookSearch(bookId, true, true, true);
+                var decisions = await _releaseSearchService.BookSearch(bookId, true, true, true, term);
                 var prioritizedDecisions = _prioritizeDownloadDecision.PrioritizeDecisions(decisions);
 
                 return MapDecisions(prioritizedDecisions);

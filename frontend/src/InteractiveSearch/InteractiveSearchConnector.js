@@ -71,15 +71,10 @@ class InteractiveSearchConnector extends Component {
   // Render
 
   render() {
-    const {
-      dispatchFetchReleases,
-      ...otherProps
-    } = this.props;
-
     return (
 
       <InteractiveSearch
-        {...otherProps}
+        {...this.props}
       />
     );
   }

@@ -2,6 +2,8 @@
 // Please do not change this file!
 interface CssExports {
   'blankpad': string;
+  'customSearch': string;
+  'customSearchInput': string;
   'filterMenuContainer': string;
   'filteredMessage': string;
 }

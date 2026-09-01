@@ -4,6 +4,16 @@
   margin-bottom: 10px;
 }
 
+.customSearch {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.customSearchInput {
+  flex-grow: 1;
+  margin-right: 10px;
+}
+
 .filteredMessage {
   margin-top: 10px;
 }

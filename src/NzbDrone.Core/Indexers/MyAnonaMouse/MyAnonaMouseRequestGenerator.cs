@@ -39,7 +39,12 @@ namespace NzbDrone.Core.Indexers.MyAnonaMouse
 
         private IEnumerable<IndexerRequest> GetPagedRequests(BookSearchCriteria searchCriteria)
         {
-            var query = searchCriteria.AuthorQuery + " " + searchCriteria.BookQuery;
+            // A custom search term from Interactive Search's "Search for a different term" box
+            // should be sent as-is, without the author name forced in front of it - that's the
+            // whole point of letting the user override the query.
+            var query = searchCriteria.IsCustomTermSearch
+                ? searchCriteria.BookQuery
+                : searchCriteria.AuthorQuery + " " + searchCriteria.BookQuery;
             if (query.IsNullOrWhiteSpace())
             {
                 _logger.Info("Search term is empty after being sanitized, stopping search. Initial book search term: '{0}'", query);
