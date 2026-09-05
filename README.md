@@ -14,7 +14,7 @@ book you will need multiple instances.
 
 The container listens on port 8787 and expects a volume mounted at `/config`.
 
-    docker run -p 8787:8787 -v ~/.config/bookshelf:/config ghcr.io/pennydreadful/bookshelf:hardcover
+    docker run -p 8787:8787 -v ~/.config/bookshelf:/config ghcr.io/darkkingwill/bookshelf:hardcover
 
 The `softcover` tags use [Goodreads](https://www.goodreads.com) as the metadata
 provider. The quality of this metadata is generally poor and contains a lot of
@@ -25,6 +25,24 @@ The `hardcover` tags use [Hardcover](https://hardcover.app/home) as a metadata
 provider. This metadata is higher quality but isn't backward-compatible; if
 you're already running Readarr you'll need to redeploy this from scratch.
 Goodreads list imports haven't been tested and likely don't work.
+
+### Metadata search providers
+
+Settings → Metadata now includes a configurable list of fallback metadata
+search providers (Google Books, Open Library, Hardcover, rreading-glasses,
+Audible, or a custom Audiobookshelf-compatible endpoint). When the primary
+search fails or returns nothing, these are tried in priority order when
+searching for a new author or book to add. Google Books and Open Library
+work with no configuration; the others need an API key/URL, entered
+directly in the settings UI.
+
+### Per-book series overrides
+
+If a metadata provider links a book to the wrong series, or a series title
+is junk (e.g. a boxset entry with an ASIN baked into the name), you can
+override the series title, position, or which linked series is treated as
+primary from that book's Edit modal, without waiting on the provider to fix
+its data.
 
 ## Support
 
