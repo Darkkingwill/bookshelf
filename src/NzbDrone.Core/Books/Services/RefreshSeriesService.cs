@@ -132,6 +132,17 @@ namespace NzbDrone.Core.Books
             var updated = false;
 
             var existingByAuthor = _seriesService.GetByAuthorMetadataId(authorMetadataId);
+
+            // The metadata source can return a "successful" response with no series at all when its own
+            // downstream series lookup silently fails, which looks identical to an author genuinely having
+            // no series anymore. Treat "had series before, now none at all" as a likely source hiccup and
+            // skip the refresh rather than deleting every series link for the author.
+            if (existingByAuthor.Any() && (remoteSeries == null || !remoteSeries.Any()))
+            {
+                _logger.Warn("Metadata source returned no series for author {0} despite {1} existing locally; skipping series refresh to avoid deleting them", authorMetadataId, existingByAuthor.Count);
+                return false;
+            }
+
             var existingBySeries = _seriesService.FindById(remoteSeries.Select(x => x.ForeignSeriesId).ToList());
             var existing = existingByAuthor.Concat(existingBySeries).GroupBy(x => x.ForeignSeriesId).Select(x => x.First()).ToList();
 
