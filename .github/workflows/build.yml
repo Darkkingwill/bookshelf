@@ -2,6 +2,7 @@ name: CI
 
 permissions:
   packages: write
+  checks: write
 
 on:
   workflow_dispatch:
