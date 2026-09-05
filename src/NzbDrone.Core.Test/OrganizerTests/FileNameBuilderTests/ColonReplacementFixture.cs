@@ -40,6 +40,9 @@ namespace NzbDrone.Core.Test.OrganizerTests.FileNameBuilderTests
                 .All()
                 .With(s => s.Position = "1-2")
                 .With(s => s.Series = series)
+                .With(s => s.TitleOverride = null)
+                .With(s => s.PositionOverride = null)
+                .With(s => s.IsPrimaryOverride = null)
                 .BuildListOfNew();
 
             _book = Builder<Book>

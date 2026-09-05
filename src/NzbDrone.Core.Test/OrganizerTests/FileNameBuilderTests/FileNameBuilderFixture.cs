@@ -46,6 +46,9 @@ namespace NzbDrone.Core.Test.OrganizerTests.FileNameBuilderTests
                 .All()
                 .With(s => s.Position = "1-2")
                 .With(s => s.Series = series)
+                .With(s => s.TitleOverride = null)
+                .With(s => s.PositionOverride = null)
+                .With(s => s.IsPrimaryOverride = null)
                 .BuildListOfNew();
 
             _book = Builder<Book>
@@ -290,6 +293,63 @@ namespace NzbDrone.Core.Test.OrganizerTests.FileNameBuilderTests
 
             Subject.BuildBookFileName(_author, _edition, _trackFile)
                 .Should().Be("Series Title #1-2");
+        }
+
+        [Test]
+        public void should_not_strip_leading_decimal_point_from_series_position()
+        {
+            _book.SeriesLinks.Value.Single().Position = ".5";
+            _namingConfig.StandardBookFormat = "{Book SeriesPosition}";
+
+            Subject.BuildBookFileName(_author, _edition, _trackFile)
+                .Should().Be(".5");
+        }
+
+        [Test]
+        public void should_prefer_series_link_overrides_over_provider_values()
+        {
+            _book.SeriesLinks.Value.Single().TitleOverride = "Emerald City";
+            _book.SeriesLinks.Value.Single().PositionOverride = "5";
+
+            _namingConfig.StandardBookFormat = "{Book SeriesPosition} - {Book Series}";
+
+            Subject.BuildBookFileName(_author, _edition, _trackFile)
+                .Should().Be("5 - Emerald City");
+        }
+
+        [Test]
+        public void should_not_leave_stray_separator_when_series_position_is_missing()
+        {
+            _book.SeriesLinks = new List<SeriesBookLink>();
+            _namingConfig.StandardBookFormat = "{Book SeriesPosition} - {Book Title}";
+
+            Subject.BuildBookFileName(_author, _edition, _trackFile)
+                .Should().Be("Hybrid Theory");
+        }
+
+        [Test]
+        public void should_prefer_series_marked_as_primary()
+        {
+            var realSeries = Builder<Series>
+                .CreateNew()
+                .With(x => x.Title = "Real Series")
+                .Build();
+
+            var junkSeries = Builder<Series>
+                .CreateNew()
+                .With(x => x.Title = "Junk Boxset Series B08VF8SQRC")
+                .Build();
+
+            _book.SeriesLinks = new List<SeriesBookLink>
+            {
+                new SeriesBookLink { Series = junkSeries, Position = "1", SeriesPosition = 1, IsPrimary = false },
+                new SeriesBookLink { Series = realSeries, Position = "5", SeriesPosition = 5, IsPrimary = true }
+            };
+
+            _namingConfig.StandardBookFormat = "{Book Series}";
+
+            Subject.BuildBookFileName(_author, _edition, _trackFile)
+                .Should().Be("Real Series");
         }
 
         [Test]

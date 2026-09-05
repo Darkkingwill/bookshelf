@@ -51,6 +51,10 @@ namespace NzbDrone.Core.Organizer
         private static readonly Regex FileNameCleanupRegex = new Regex(@"([- ._])(\1)+", RegexOptions.Compiled);
         private static readonly Regex TrimSeparatorsRegex = new Regex(@"[- ._]$", RegexOptions.Compiled);
 
+        // Strips a leading run of separator characters, but leaves a leading '.' alone when
+        // it's followed by a digit (a decimal series position like ".5" isn't a stray separator).
+        private static readonly Regex TrimLeadingSeparatorsRegex = new Regex(@"^(?:[- _]|\.(?!\d))+", RegexOptions.Compiled);
+
         private static readonly Regex ScenifyRemoveChars = new Regex(@"(?<=\s)(,|<|>|\/|\\|;|:|'|""|\||`|~|!|\?|@|$|%|^|\*|-|_|=){1}(?=\s)|('|:|\?|,)(?=(?:(?:s|m)\s)|\s|$)|(\(|\)|\[|\]|\{|\})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex ScenifyReplaceChars = new Regex(@"[\/]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -109,6 +113,7 @@ namespace NzbDrone.Core.Organizer
 
                 component = FileNameCleanupRegex.Replace(component, match => match.Captures[0].Value[0].ToString());
                 component = TrimSeparatorsRegex.Replace(component, string.Empty);
+                component = TrimLeadingSeparatorsRegex.Replace(component, string.Empty);
 
                 if (component.IsNotNullOrWhiteSpace())
                 {
@@ -268,11 +273,15 @@ namespace NzbDrone.Core.Organizer
             var seriesLinks = edition.Book.Value.SeriesLinks.Value;
             if (seriesLinks.Any())
             {
-                var primarySeries = seriesLinks.OrderBy(x => x.SeriesPosition).First();
-                var seriesTitle = primarySeries.Series?.Value?.Title + (primarySeries.Position.IsNotNullOrWhiteSpace() ? $" #{primarySeries.Position}" : string.Empty);
+                var primarySeries = seriesLinks.FirstOrDefault(x => x.IsPrimaryOverride ?? x.IsPrimary) ??
+                                     seriesLinks.OrderBy(x => x.SeriesPosition).First();
 
-                tokenHandlers["{Book Series}"] = m => primarySeries.Series.Value.Title;
-                tokenHandlers["{Book SeriesPosition}"] = m => primarySeries.Position;
+                var seriesTitleValue = primarySeries.TitleOverride.IsNotNullOrWhiteSpace() ? primarySeries.TitleOverride : primarySeries.Series?.Value?.Title;
+                var seriesPositionValue = primarySeries.PositionOverride.IsNotNullOrWhiteSpace() ? primarySeries.PositionOverride : primarySeries.Position;
+                var seriesTitle = seriesTitleValue + (seriesPositionValue.IsNotNullOrWhiteSpace() ? $" #{seriesPositionValue}" : string.Empty);
+
+                tokenHandlers["{Book Series}"] = m => seriesTitleValue;
+                tokenHandlers["{Book SeriesPosition}"] = m => seriesPositionValue;
                 tokenHandlers["{Book SeriesTitle}"] = m => seriesTitle;
             }
 
@@ -541,7 +550,16 @@ namespace NzbDrone.Core.Organizer
                 result = result.Replace(badCharacters[i], namingConfig.ReplaceIllegalCharacters ? goodCharacters[i] : string.Empty);
             }
 
-            return result.TrimStart(' ', '.').TrimEnd(' ');
+            result = result.TrimStart(' ');
+
+            // Don't eat a leading decimal point on values like series position ".5" -
+            // only strip stray leading dots that aren't part of a number.
+            if (result.StartsWith(".", StringComparison.Ordinal) && (result.Length == 1 || !char.IsDigit(result[1])))
+            {
+                result = result.TrimStart('.').TrimStart(' ');
+            }
+
+            return result.TrimEnd(' ');
         }
     }
 
