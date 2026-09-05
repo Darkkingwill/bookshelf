@@ -11,6 +11,11 @@ namespace NzbDrone.Core.Books
         public int BookId { get; set; }
         public bool IsPrimary { get; set; }
 
+        // User-set overrides. Never touched by UseMetadataFrom, so they survive metadata provider refreshes.
+        public string TitleOverride { get; set; }
+        public string PositionOverride { get; set; }
+        public bool? IsPrimaryOverride { get; set; }
+
         [MemberwiseEqualityIgnore]
         public LazyLoaded<Series> Series { get; set; }
         [MemberwiseEqualityIgnore]

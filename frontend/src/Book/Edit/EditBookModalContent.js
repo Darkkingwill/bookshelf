@@ -14,6 +14,7 @@ import ModalHeader from 'Components/Modal/ModalHeader';
 import { inputTypes } from 'Helpers/Props';
 import getErrorMessage from 'Utilities/Object/getErrorMessage';
 import translate from 'Utilities/String/translate';
+import SeriesLinkEditor from './SeriesLinkEditor';
 
 class EditBookModalContent extends Component {
 
@@ -34,6 +35,7 @@ class EditBookModalContent extends Component {
 
   render() {
     const {
+      bookId,
       title,
       authorName,
       statistics,
@@ -123,6 +125,14 @@ class EditBookModalContent extends Component {
             }
 
           </Form>
+
+          <FormGroup>
+            <FormLabel>
+              Series
+            </FormLabel>
+
+            <SeriesLinkEditor bookId={bookId} />
+          </FormGroup>
         </ModalBody>
         <ModalFooter>
           <Button
