@@ -106,11 +106,11 @@ function Settings() {
           className={styles.link}
           to="/settings/metadata"
         >
-          {translate('Metadata')}
+          Metadata Sources
         </Link>
 
         <div className={styles.summary}>
-          {translate('MetadataSettingsSummary')}
+          Configure metadata providers, Calibre integration, and API keys
         </div>
 
         <Link

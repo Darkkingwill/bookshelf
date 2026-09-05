@@ -15,10 +15,12 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
 using NzbDrone.Common.Serializer;
 using NzbDrone.Core.Books;
+using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Http;
 using NzbDrone.Core.MediaCover;
 using NzbDrone.Core.MetadataSource.Goodreads;
+using NzbDrone.Core.MetadataSource.Providers;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace NzbDrone.Core.MetadataSource.BookInfo
@@ -39,6 +41,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         private readonly IEditionService _editionService;
         private readonly Logger _logger;
         private readonly IMetadataRequestBuilder _requestBuilder;
+        private readonly IMetadataProviderService _metadataProviderService;
         private readonly ICached<HashSet<string>> _cache;
         private readonly CachingService _authorCache;
 
@@ -49,6 +52,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                              IBookService bookService,
                              IEditionService editionService,
                              IMetadataRequestBuilder requestBuilder,
+                             IMetadataProviderService metadataProviderService,
                              Logger logger,
                              ICacheManager cacheManager)
         {
@@ -59,6 +63,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             _bookService = bookService;
             _editionService = editionService;
             _requestBuilder = requestBuilder;
+            _metadataProviderService = metadataProviderService;
             _cache = cacheManager.GetCache<HashSet<string>>(GetType());
             _logger = logger;
 
@@ -155,10 +160,32 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         {
             var books = SearchForNewBook(title, null);
 
-            return books
+            var authors = books
                 .Select(x => x.Author.Value)
                 .DistinctBy(x => x.ForeignAuthorId)
                 .ToList();
+
+            if (authors.Any())
+            {
+                return authors;
+            }
+
+            // Fall back to multi-provider search
+            _logger.Info("Legacy search returned no results for '{0}', trying metadata providers", title);
+            try
+            {
+                var providerResults = _metadataProviderService.SearchAuthors(title);
+                if (providerResults != null && providerResults.Any())
+                {
+                    return providerResults.Select(MapMetadataResultToAuthor).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Multi-provider author search failed for '{0}'", title);
+            }
+
+            return authors;
         }
 
         public List<Book> SearchForNewBook(string title, string author, bool getAllEditions = true)
@@ -168,6 +195,8 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             {
                 q += " " + author;
             }
+
+            List<Book> legacyResults = null;
 
             try
             {
@@ -213,18 +242,35 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                     q = slug;
                 }
 
-                return Search(q, getAllEditions);
+                legacyResults = Search(q, getAllEditions);
             }
-            catch (HttpException ex)
+            catch (Exception ex)
             {
-                _logger.Warn(ex, ex.Message);
-                throw new GoodreadsException("Search for '{0}' failed. Unable to communicate with Goodreads.", ex, title);
+                _logger.Warn(ex, "Legacy search failed for '{0}', trying metadata providers", title);
             }
-            catch (Exception ex) when (ex is not BookInfoException)
+
+            if (legacyResults != null && legacyResults.Any())
             {
-                _logger.Warn(ex, ex.Message);
-                throw new GoodreadsException("Search for '{0}' failed. Invalid response received from Goodreads.", ex, title);
+                return legacyResults;
             }
+
+            // Fall back to multi-provider search
+            _logger.Info("Legacy search returned no results for '{0}', trying metadata providers", title);
+            try
+            {
+                var searchQuery = author != null ? $"{title} {author}" : title;
+                var providerResults = _metadataProviderService.SearchBooks(searchQuery);
+                if (providerResults != null && providerResults.Any())
+                {
+                    return providerResults.Select(MapMetadataResultToBook).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Multi-provider book search failed for '{0}'", title);
+            }
+
+            return legacyResults ?? new List<Book>();
         }
 
         public List<Book> SearchByIsbn(string isbn)
@@ -989,6 +1035,104 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             var book = b.Books.OrderByDescending(x => x.RatingCount * x.AverageRating)
                 .FirstOrDefault(x => x.Contributors != null && x.Contributors.Any());
             return book?.Contributors?.FirstOrDefault()?.ForeignId ?? 0;
+        }
+
+        private Author MapMetadataResultToAuthor(MetadataSearchResult result)
+        {
+            var foreignId = $"{result.ProviderKey}:{result.ForeignId}";
+            var name = result.Title ?? "Unknown";
+
+            var metadata = new AuthorMetadata
+            {
+                ForeignAuthorId = foreignId,
+                Name = name,
+                SortName = name,
+                TitleSlug = foreignId.Replace(":", "-"),
+                Status = AuthorStatusType.Continuing,
+                Overview = result.Description ?? string.Empty,
+                Images = new List<MediaCover.MediaCover>(),
+                Links = new List<Links> { new Links { Url = $"https://www.google.com/search?q={Uri.EscapeDataString(name)}", Name = "Google" } }
+            };
+
+            if (!string.IsNullOrWhiteSpace(result.CoverUrl))
+            {
+                metadata.Images.Add(new MediaCover.MediaCover
+                {
+                    CoverType = MediaCover.MediaCoverTypes.Poster,
+                    Url = result.CoverUrl,
+                    RemoteUrl = result.CoverUrl
+                });
+            }
+
+            return new Author
+            {
+                CleanName = Parser.Parser.CleanAuthorName(name),
+                Metadata = metadata,
+                Monitored = false
+            };
+        }
+
+        private Book MapMetadataResultToBook(MetadataSearchResult result)
+        {
+            var foreignId = $"{result.ProviderKey}:{result.ForeignId}";
+            var authorName = result.Authors?.FirstOrDefault() ?? "Unknown Author";
+            var authorForeignId = $"{result.ProviderKey}:author:{authorName.ToLowerInvariant().Replace(" ", "-")}";
+
+            var authorMetadata = new AuthorMetadata
+            {
+                ForeignAuthorId = authorForeignId,
+                Name = authorName,
+                SortName = authorName,
+                TitleSlug = authorForeignId.Replace(":", "-"),
+                Status = AuthorStatusType.Continuing,
+                Images = new List<MediaCover.MediaCover>(),
+                Links = new List<Links> { new Links { Url = $"https://www.google.com/search?q={Uri.EscapeDataString(authorName)}", Name = "Google" } }
+            };
+
+            var author = new Author
+            {
+                CleanName = Parser.Parser.CleanAuthorName(authorName),
+                Metadata = authorMetadata,
+                Monitored = false
+            };
+
+            var edition = new Edition
+            {
+                ForeignEditionId = foreignId,
+                Title = result.Title ?? "Unknown",
+                Isbn13 = result.Isbn13,
+                Asin = result.Asin,
+                Overview = result.Description,
+                PageCount = result.PageCount ?? 0,
+                Publisher = result.Publisher,
+                Images = new List<MediaCover.MediaCover>(),
+                Links = new List<Links> { new Links { Url = $"https://www.google.com/search?q={Uri.EscapeDataString((result.Title ?? "Unknown") + " " + authorName)}", Name = "Google" } },
+                Monitored = true
+            };
+
+            if (!string.IsNullOrWhiteSpace(result.CoverUrl))
+            {
+                edition.Images.Add(new MediaCover.MediaCover
+                {
+                    CoverType = MediaCover.MediaCoverTypes.Cover,
+                    Url = result.CoverUrl,
+                    RemoteUrl = result.CoverUrl
+                });
+            }
+
+            var bookTitle = result.Title ?? "Unknown";
+            var book = new Book
+            {
+                ForeignBookId = foreignId,
+                Title = bookTitle,
+                CleanTitle = Parser.Parser.CleanAuthorName(bookTitle),
+                Links = new List<Links> { new Links { Url = $"https://www.google.com/search?q={Uri.EscapeDataString(bookTitle + " " + authorName)}", Name = "Google" } },
+                Author = new LazyLoaded<Author>(author),
+                AuthorMetadata = new LazyLoaded<AuthorMetadata>(authorMetadata),
+                Editions = new LazyLoaded<List<Edition>>(new List<Edition> { edition })
+            };
+
+            return book;
         }
     }
 }

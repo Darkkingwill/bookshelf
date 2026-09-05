@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.EnsureThat;
 using NzbDrone.Common.Extensions;
@@ -10,6 +11,7 @@ using NzbDrone.Core.Configuration.Events;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.MetadataSource.Providers;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Security;
 
@@ -285,6 +287,41 @@ namespace NzbDrone.Core.Configuration
             {
                 SetValue("MetadataSource", value);
             }
+        }
+
+        public List<MetadataProviderConfig> GetMetadataProviderConfigs()
+        {
+            var json = GetValue("MetadataProviderConfigs", "");
+            if (json.IsNullOrWhiteSpace())
+            {
+                return GetDefaultProviderConfigs();
+            }
+
+            try
+            {
+                return JsonConvert.DeserializeObject<List<MetadataProviderConfig>>(json) ?? GetDefaultProviderConfigs();
+            }
+            catch
+            {
+                return GetDefaultProviderConfigs();
+            }
+        }
+
+        public void SaveMetadataProviderConfigs(List<MetadataProviderConfig> configs)
+        {
+            SetValue("MetadataProviderConfigs", JsonConvert.SerializeObject(configs));
+        }
+
+        private List<MetadataProviderConfig> GetDefaultProviderConfigs()
+        {
+            return new List<MetadataProviderConfig>
+            {
+                new MetadataProviderConfig { Key = "googlebooks", Enabled = true, Priority = 0 },
+                new MetadataProviderConfig { Key = "openlibrary", Enabled = true, Priority = 1 },
+                new MetadataProviderConfig { Key = "audible", Enabled = false, Priority = 2 },
+                new MetadataProviderConfig { Key = "hardcover", Enabled = false, Priority = 3 },
+                new MetadataProviderConfig { Key = "rreadingglasses", Enabled = false, Priority = 4 }
+            };
         }
 
         public WriteAudioTagsType WriteAudioTags
