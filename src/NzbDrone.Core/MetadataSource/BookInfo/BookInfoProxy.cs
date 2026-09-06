@@ -36,6 +36,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         private readonly IHttpClient _httpClient;
         private readonly ICachedHttpResponseService _cachedHttpClient;
         private readonly IGoodreadsSearchProxy _goodreadsSearchProxy;
+        private readonly IGoodreadsProxy _goodreadsProxy;
         private readonly IAuthorService _authorService;
         private readonly IBookService _bookService;
         private readonly IEditionService _editionService;
@@ -48,6 +49,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         public BookInfoProxy(IHttpClient httpClient,
                              ICachedHttpResponseService cachedHttpClient,
                              IGoodreadsSearchProxy goodreadsSearchProxy,
+                             IGoodreadsProxy goodreadsProxy,
                              IAuthorService authorService,
                              IBookService bookService,
                              IEditionService editionService,
@@ -59,6 +61,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             _httpClient = httpClient;
             _cachedHttpClient = cachedHttpClient;
             _goodreadsSearchProxy = goodreadsSearchProxy;
+            _goodreadsProxy = goodreadsProxy;
             _authorService = authorService;
             _bookService = bookService;
             _editionService = editionService;
@@ -96,6 +99,24 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         public Author GetAuthorInfo(string foreignAuthorId, bool useCache = false)
         {
             _logger.Debug("Getting Author details GoodreadsId of {0}", foreignAuthorId);
+
+            // A bare numeric id is always a legacy Goodreads author id in this app's convention
+            // (fallback-provider ids are always "provider:rawId"). Prefer going straight to
+            // Goodreads for these rather than whatever's configured as the primary metadata
+            // source - that source may not recognize a raw Goodreads id at all (e.g. a
+            // Hardcover-backed source), or may itself fail to authenticate against Goodreads
+            // for author lookups specifically. Fall back to the configured source if this fails.
+            if (long.TryParse(foreignAuthorId, out var goodreadsAuthorId))
+            {
+                try
+                {
+                    return _goodreadsProxy.GetAuthorInfo(goodreadsAuthorId, useCache);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn(ex, "Direct Goodreads author lookup failed for {0}, falling back to configured metadata source", foreignAuthorId);
+                }
+            }
 
             try
             {

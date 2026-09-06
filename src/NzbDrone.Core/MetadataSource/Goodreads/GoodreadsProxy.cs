@@ -15,6 +15,7 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
     public interface IGoodreadsProxy
     {
         Book GetBookInfo(string foreignEditionId);
+        Author GetAuthorInfo(long foreignAuthorId, bool useCache = false);
     }
 
     public class GoodreadsProxy : IGoodreadsProxy, IProvideSeriesInfo, IProvideListInfo
@@ -66,6 +67,43 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             var resource = httpResponse.Deserialize<ShowSeriesResource>();
 
             return resource.Series;
+        }
+
+        public Author GetAuthorInfo(long foreignAuthorId, bool useCache = false)
+        {
+            _logger.Debug("Getting Author with GoodreadsId of {0}", foreignAuthorId);
+
+            var httpRequest = _requestBuilder.Create()
+                .SetSegment("route", $"author/show/{foreignAuthorId}")
+                .AddQueryParam("format", "xml")
+                .Build();
+
+            httpRequest.AllowAutoRedirect = true;
+            httpRequest.SuppressHttpError = true;
+
+            var httpResponse = _cachedHttpClient.Get(httpRequest, useCache, TimeSpan.FromDays(1));
+
+            if (httpResponse.HasHttpError)
+            {
+                if (httpResponse.StatusCode == HttpStatusCode.NotFound)
+                {
+                    throw new AuthorNotFoundException(foreignAuthorId.ToString());
+                }
+                else
+                {
+                    throw new HttpException(httpRequest, httpResponse);
+                }
+            }
+
+            var authorResource = httpResponse.Deserialize<AuthorResource>();
+            var bookList = httpResponse.Deserialize<AuthorBookListResource>();
+
+            if (authorResource == null)
+            {
+                throw new AuthorNotFoundException(foreignAuthorId.ToString());
+            }
+
+            return MapAuthorShow(authorResource, bookList);
         }
 
         public ListResource GetListInfo(int foreignListId, int page, bool useCache = true)
@@ -174,6 +212,50 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             }
 
             return author;
+        }
+
+        private static Author MapAuthorShow(AuthorResource resource, AuthorBookListResource bookList)
+        {
+            var metadata = new AuthorMetadata
+            {
+                ForeignAuthorId = resource.Id.ToString(),
+                TitleSlug = resource.Id.ToString(),
+                Name = resource.Name.CleanSpaces(),
+                Overview = resource.About,
+                Status = AuthorStatusType.Continuing
+            };
+
+            metadata.SortName = metadata.Name.ToLower();
+            metadata.NameLastFirst = metadata.Name.ToLastFirst();
+            metadata.SortNameLastFirst = metadata.NameLastFirst.ToLower();
+
+            if (resource.ImageUrl.IsNotNullOrWhiteSpace())
+            {
+                metadata.Images.Add(new MediaCover.MediaCover { Url = resource.ImageUrl, CoverType = MediaCover.MediaCoverTypes.Poster });
+            }
+
+            if (resource.Link.IsNotNullOrWhiteSpace())
+            {
+                metadata.Links.Add(new Links { Url = resource.Link, Name = "Goodreads" });
+            }
+
+            // Each entry is a distinct Goodreads book (edition), grouped/keyed by its work id
+            // downstream - MapBook already returns one Book per BookResource, so just dedupe
+            // in case the same work shows up more than once (e.g. multiple editions listed).
+            var books = (bookList?.List ?? new List<BookResource>())
+                .Where(b => b.Work != null && b.Work.Id > 0)
+                .Select(MapBook)
+                .DistinctBy(b => b.ForeignBookId)
+                .ToList();
+
+            books.ForEach(b => b.AuthorMetadata = metadata);
+
+            return new Author
+            {
+                Metadata = metadata,
+                CleanName = Parser.Parser.CleanAuthorName(metadata.Name),
+                Books = books
+            };
         }
 
         private static Book MapBook(BookResource resource)
