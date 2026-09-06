@@ -307,7 +307,7 @@ namespace NzbDrone.Core.MetadataSource.Providers
 
             var result = new MetadataSearchResult
             {
-                ForeignId = $"audible:{asin}",
+                ForeignId = asin,
                 ProviderKey = Key,
                 Title = title,
                 Subtitle = item.Value<string>("subtitle"),

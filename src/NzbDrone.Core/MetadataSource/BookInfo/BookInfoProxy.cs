@@ -125,6 +125,11 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
 
         public Tuple<string, Book, List<AuthorMetadata>> GetBookInfo(string foreignBookId)
         {
+            if (TryParseProviderForeignId(foreignBookId, out var providerKey, out var rawId))
+            {
+                return GetBookInfoFromProvider(providerKey, rawId, foreignBookId);
+            }
+
             try
             {
                 return PollBook(foreignBookId);
@@ -134,6 +139,115 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                 _logger.Warn(e, "Unexpected error getting book info: {foreignBookId}", foreignBookId);
                 throw;
             }
+        }
+
+        // Book/author IDs sourced from a fallback metadata provider are synthesized as
+        // "{providerKey}:{rawId}" (see MapMetadataResultToBook/Author below). The legacy
+        // REST lookup (PollBook) doesn't understand that shape and 400s on it, so route
+        // those back to the provider that produced them instead.
+        private static readonly HashSet<string> KnownProviderKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "googlebooks", "openlibrary", "audible", "hardcover", "rreadingglasses"
+        };
+
+        private bool TryParseProviderForeignId(string foreignId, out string providerKey, out string rawId)
+        {
+            providerKey = null;
+            rawId = null;
+
+            var idx = foreignId?.IndexOf(':') ?? -1;
+            if (idx <= 0)
+            {
+                return false;
+            }
+
+            var prefix = foreignId.Substring(0, idx);
+            if (!KnownProviderKeys.Contains(prefix))
+            {
+                return false;
+            }
+
+            providerKey = prefix;
+            rawId = foreignId.Substring(idx + 1);
+            return true;
+        }
+
+        private Tuple<string, Book, List<AuthorMetadata>> GetBookInfoFromProvider(string providerKey, string rawId, string compositeForeignId)
+        {
+            var result = _metadataProviderService.GetBookInfo(providerKey, rawId);
+
+            if (result == null)
+            {
+                throw new BookNotFoundException(compositeForeignId);
+            }
+
+            var authorName = result.Authors?.FirstOrDefault() ?? "Unknown Author";
+            var authorForeignId = result.AuthorForeignId ?? $"{providerKey}:author:{authorName.ToLowerInvariant().Replace(" ", "-")}";
+
+            var authorMetadata = new AuthorMetadata
+            {
+                ForeignAuthorId = authorForeignId,
+                Name = authorName,
+                SortName = authorName,
+                TitleSlug = authorForeignId.Replace(":", "-"),
+                Status = AuthorStatusType.Continuing,
+                Images = new List<MediaCover.MediaCover>(),
+                Links = new List<Links> { new Links { Url = $"https://www.google.com/search?q={Uri.EscapeDataString(authorName)}", Name = "Google" } }
+            };
+
+            var author = new Author
+            {
+                CleanName = Parser.Parser.CleanAuthorName(authorName),
+                Metadata = authorMetadata,
+                Monitored = false
+            };
+
+            var editionResults = result.Editions != null && result.Editions.Any()
+                ? result.Editions
+                : new List<MetadataEditionResult> { new MetadataEditionResult { ForeignId = rawId, Title = result.Title, CoverUrl = result.CoverUrl } };
+
+            var editions = editionResults.Select((e, idx) =>
+            {
+                var edition = new Edition
+                {
+                    // The first/primary edition keeps the same id the search result was picked
+                    // by (AddSkyhookData matches on it) - any extras get their own distinct id.
+                    ForeignEditionId = idx == 0 ? compositeForeignId : $"{providerKey}:{e.ForeignId ?? rawId}-{idx}",
+                    Title = e.Title ?? result.Title ?? "Unknown",
+                    Isbn13 = e.Isbn13,
+                    Asin = e.Asin,
+                    Overview = result.Description,
+                    PageCount = e.PageCount ?? 0,
+                    Publisher = e.Publisher,
+                    Images = new List<MediaCover.MediaCover>(),
+                    Monitored = true
+                };
+
+                var coverUrl = e.CoverUrl ?? result.CoverUrl;
+                if (!string.IsNullOrWhiteSpace(coverUrl))
+                {
+                    edition.Images.Add(new MediaCover.MediaCover
+                    {
+                        CoverType = MediaCover.MediaCoverTypes.Cover,
+                        Url = coverUrl,
+                        RemoteUrl = coverUrl
+                    });
+                }
+
+                return edition;
+            }).ToList();
+
+            var book = new Book
+            {
+                ForeignBookId = compositeForeignId,
+                Title = result.Title ?? "Unknown",
+                CleanTitle = Parser.Parser.CleanAuthorName(result.Title ?? "Unknown"),
+                Author = new LazyLoaded<Author>(author),
+                AuthorMetadata = new LazyLoaded<AuthorMetadata>(authorMetadata),
+                Editions = new LazyLoaded<List<Edition>>(editions)
+            };
+
+            return Tuple.Create(authorForeignId, book, new List<AuthorMetadata> { authorMetadata });
         }
 
         public List<object> SearchForNewEntity(string title)
