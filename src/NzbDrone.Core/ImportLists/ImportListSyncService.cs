@@ -370,8 +370,12 @@ namespace NzbDrone.Core.ImportLists
                 return null;
             }
 
-            // Check to see if author in DB
-            var existingAuthor = _authorService.FindById(report.AuthorGoodreadsId);
+            // Check to see if author in DB. A list report's author id is whatever source the
+            // list itself uses (e.g. a raw Goodreads id), which won't match an author originally
+            // added via a different metadata source - fall back to matching by name so this
+            // doesn't create a colliding duplicate author record for the same person.
+            var existingAuthor = _authorService.FindById(report.AuthorGoodreadsId)
+                ?? (report.Author.IsNotNullOrWhiteSpace() ? _authorService.FindByName(report.Author) : null);
 
             // Check to see if author excluded
             var excludedAuthor = listExclusions.SingleOrDefault(s => s.ForeignId == report.AuthorGoodreadsId);
