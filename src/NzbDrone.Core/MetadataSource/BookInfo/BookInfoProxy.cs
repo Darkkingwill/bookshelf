@@ -215,11 +215,13 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
 
             var editions = editionResults.Select((e, idx) =>
             {
+                var editionForeignId = idx == 0 ? compositeForeignId : $"{providerKey}:{e.ForeignId ?? rawId}-{idx}";
                 var edition = new Edition
                 {
                     // The first/primary edition keeps the same id the search result was picked
                     // by (AddSkyhookData matches on it) - any extras get their own distinct id.
-                    ForeignEditionId = idx == 0 ? compositeForeignId : $"{providerKey}:{e.ForeignId ?? rawId}-{idx}",
+                    ForeignEditionId = editionForeignId,
+                    TitleSlug = editionForeignId.Replace(":", "-"),
                     Title = e.Title ?? result.Title ?? "Unknown",
                     Isbn13 = e.Isbn13,
                     Asin = e.Asin,
@@ -247,6 +249,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             var book = new Book
             {
                 ForeignBookId = compositeForeignId,
+                TitleSlug = compositeForeignId.Replace(":", "-"),
                 Title = result.Title ?? "Unknown",
                 CleanTitle = Parser.Parser.CleanAuthorName(result.Title ?? "Unknown"),
                 Author = new LazyLoaded<Author>(author),
@@ -1225,6 +1228,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             var edition = new Edition
             {
                 ForeignEditionId = foreignId,
+                TitleSlug = foreignId.Replace(":", "-"),
                 Title = result.Title ?? "Unknown",
                 Isbn13 = result.Isbn13,
                 Asin = result.Asin,
@@ -1250,6 +1254,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             var book = new Book
             {
                 ForeignBookId = foreignId,
+                TitleSlug = foreignId.Replace(":", "-"),
                 Title = bookTitle,
                 CleanTitle = Parser.Parser.CleanAuthorName(bookTitle),
                 Links = new List<Links> { new Links { Url = $"https://www.google.com/search?q={Uri.EscapeDataString(bookTitle + " " + authorName)}", Name = "Google" } },
