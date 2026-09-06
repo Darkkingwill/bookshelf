@@ -367,7 +367,8 @@ namespace NzbDrone.Core.MediaFiles.BookImport
 
             if (author.Id == 0)
             {
-                var dbAuthor = _authorService.FindById(author.ForeignAuthorId);
+                var dbAuthor = _authorService.FindById(author.ForeignAuthorId)
+                    ?? _authorService.FindByName(author.Name);
 
                 if (dbAuthor == null)
                 {

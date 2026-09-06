@@ -135,7 +135,8 @@ namespace NzbDrone.Core.Books
             // TODO filter by metadata id before hitting database
             _logger.Trace($"Ensuring parent author exists [{remote.AuthorMetadata.Value.ForeignAuthorId}]");
 
-            var newAuthor = _authorService.FindById(remote.AuthorMetadata.Value.ForeignAuthorId);
+            var newAuthor = _authorService.FindById(remote.AuthorMetadata.Value.ForeignAuthorId)
+                ?? _authorService.FindByName(remote.AuthorMetadata.Value.Name);
 
             if (newAuthor == null)
             {
