@@ -36,6 +36,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         private readonly IHttpClient _httpClient;
         private readonly ICachedHttpResponseService _cachedHttpClient;
         private readonly IGoodreadsSearchProxy _goodreadsSearchProxy;
+        private readonly IGoodreadsProxy _goodreadsProxy;
         private readonly IAuthorService _authorService;
         private readonly IBookService _bookService;
         private readonly IEditionService _editionService;
@@ -48,6 +49,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         public BookInfoProxy(IHttpClient httpClient,
                              ICachedHttpResponseService cachedHttpClient,
                              IGoodreadsSearchProxy goodreadsSearchProxy,
+                             IGoodreadsProxy goodreadsProxy,
                              IAuthorService authorService,
                              IBookService bookService,
                              IEditionService editionService,
@@ -59,6 +61,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             _httpClient = httpClient;
             _cachedHttpClient = cachedHttpClient;
             _goodreadsSearchProxy = goodreadsSearchProxy;
+            _goodreadsProxy = goodreadsProxy;
             _authorService = authorService;
             _bookService = bookService;
             _editionService = editionService;
@@ -93,9 +96,19 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             return new HashSet<string>(httpResponse.Resource.Ids.Select(x => x.ToString()));
         }
 
-        public Author GetAuthorInfo(string foreignAuthorId, bool useCache = false)
+        public Author GetAuthorInfo(string foreignAuthorId, bool useCache = false, string metadataSource = null)
         {
             _logger.Debug("Getting Author details GoodreadsId of {0}", foreignAuthorId);
+
+            // Only take this branch when the caller explicitly knows which provider this id
+            // belongs to (e.g. an author's own pinned MetadataSource). Never guess from the id's
+            // shape alone - a bare number is ambiguous between providers (see the incident this
+            // was built to fix: a Hardcover author id collided in value, not meaning, with an
+            // unrelated real Goodreads author sharing the same number).
+            if (metadataSource.IsNotNullOrWhiteSpace())
+            {
+                return GetAuthorInfoFromSource(metadataSource, foreignAuthorId);
+            }
 
             try
             {
@@ -198,6 +211,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                 SortName = authorName,
                 TitleSlug = authorForeignId.Replace(":", "-"),
                 Status = AuthorStatusType.Continuing,
+                MetadataSource = providerKey,
                 Images = new List<MediaCover.MediaCover>(),
                 Links = new List<Links> { new Links { Url = $"https://www.google.com/search?q={Uri.EscapeDataString(authorName)}", Name = "Google" } }
             };
@@ -258,6 +272,97 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             };
 
             return Tuple.Create(authorForeignId, book, new List<AuthorMetadata> { authorMetadata });
+        }
+
+        private Author GetAuthorInfoFromSource(string metadataSource, string foreignAuthorId)
+        {
+            if (metadataSource.Equals("goodreads", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!long.TryParse(foreignAuthorId, out var goodreadsAuthorId))
+                {
+                    throw new AuthorNotFoundException(foreignAuthorId);
+                }
+
+                return _goodreadsProxy.GetAuthorInfo(goodreadsAuthorId);
+            }
+
+            var result = _metadataProviderService.GetAuthorInfo(metadataSource, foreignAuthorId);
+
+            if (result == null)
+            {
+                throw new AuthorNotFoundException(foreignAuthorId);
+            }
+
+            return MapProviderAuthorResult(metadataSource, result);
+        }
+
+        private static Author MapProviderAuthorResult(string metadataSource, MetadataAuthorResult result)
+        {
+            var metadata = new AuthorMetadata
+            {
+                ForeignAuthorId = result.ForeignId,
+                TitleSlug = result.ForeignId,
+                Name = result.Name,
+                SortName = result.Name?.ToLowerInvariant(),
+                Overview = result.Description,
+                Status = AuthorStatusType.Continuing,
+                MetadataSource = metadataSource
+            };
+
+            if (result.ImageUrl.IsNotNullOrWhiteSpace())
+            {
+                metadata.Images.Add(new MediaCover.MediaCover { Url = result.ImageUrl, CoverType = MediaCover.MediaCoverTypes.Poster });
+            }
+
+            var books = (result.Works ?? new List<MetadataSearchResult>())
+                .Where(w => w.ForeignId.IsNotNullOrWhiteSpace())
+                .Select(w => MapProviderWorkToBook(metadataSource, w))
+                .DistinctBy(b => b.ForeignBookId)
+                .ToList();
+
+            books.ForEach(b => b.AuthorMetadata = metadata);
+
+            return new Author
+            {
+                Metadata = metadata,
+                CleanName = Parser.Parser.CleanAuthorName(metadata.Name),
+                Books = books,
+                Series = new List<Series>()
+            };
+        }
+
+        private static Book MapProviderWorkToBook(string metadataSource, MetadataSearchResult result)
+        {
+            var foreignId = $"{metadataSource}:{result.ForeignId}";
+
+            var edition = new Edition
+            {
+                ForeignEditionId = foreignId,
+                TitleSlug = foreignId.Replace(":", "-"),
+                Title = result.Title ?? "Unknown",
+                Isbn13 = result.Isbn13,
+                Asin = result.Asin,
+                Overview = result.Description,
+                PageCount = result.PageCount ?? 0,
+                Publisher = result.Publisher,
+                Images = new List<MediaCover.MediaCover>(),
+                Monitored = true
+            };
+
+            if (result.CoverUrl.IsNotNullOrWhiteSpace())
+            {
+                edition.Images.Add(new MediaCover.MediaCover { Url = result.CoverUrl, CoverType = MediaCover.MediaCoverTypes.Cover });
+            }
+
+            return new Book
+            {
+                ForeignBookId = foreignId,
+                TitleSlug = foreignId.Replace(":", "-"),
+                Title = result.Title ?? "Unknown",
+                CleanTitle = Parser.Parser.CleanAuthorName(result.Title ?? "Unknown"),
+                AnyEditionOk = true,
+                Editions = new List<Edition> { edition }
+            };
         }
 
         public List<object> SearchForNewEntity(string title)
@@ -1214,6 +1319,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                 SortName = authorName,
                 TitleSlug = authorForeignId.Replace(":", "-"),
                 Status = AuthorStatusType.Continuing,
+                MetadataSource = result.ProviderKey,
                 Images = new List<MediaCover.MediaCover>(),
                 Links = new List<Links> { new Links { Url = $"https://www.google.com/search?q={Uri.EscapeDataString(authorName)}", Name = "Google" } }
             };

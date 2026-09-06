@@ -98,6 +98,14 @@ namespace NzbDrone.Core.Books
             RootFolderPath = other.RootFolderPath;
             Monitored = other.Monitored;
             MonitorNewItems = other.MonitorNewItems;
+
+            // Deliberately the one Metadata field let through here - everything else about
+            // Metadata is owned by the refresh pipeline, but this one is a user-facing setting
+            // (which provider a refresh should pin to) that has nowhere else to be edited from.
+            if (other.Metadata?.Value?.MetadataSource.IsNotNullOrWhiteSpace() == true)
+            {
+                Metadata.Value.MetadataSource = other.Metadata.Value.MetadataSource;
+            }
         }
     }
 }

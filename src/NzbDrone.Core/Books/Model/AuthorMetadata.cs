@@ -17,6 +17,15 @@ namespace NzbDrone.Core.Books
         }
 
         public string ForeignAuthorId { get; set; }
+
+        // Which metadata provider this author's identity was established through
+        // ("hardcover", "goodreads", "googlebooks", "openlibrary", "audible",
+        // "rreadingglasses"). Deliberately NOT touched by UseMetadataFrom - it's set once at
+        // add time (or changed explicitly by the user) and must survive every later refresh,
+        // otherwise a refresh has no way to know which provider's id space ForeignAuthorId
+        // actually belongs to.
+        public string MetadataSource { get; set; } = "hardcover";
+
         public string TitleSlug { get; set; }
         public string Name { get; set; }
         public string SortName { get; set; }

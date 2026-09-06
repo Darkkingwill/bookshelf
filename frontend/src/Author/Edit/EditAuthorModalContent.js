@@ -19,6 +19,15 @@ import { icons, inputTypes, kinds, tooltipPositions } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import styles from './EditAuthorModalContent.css';
 
+const metadataSourceOptions = [
+  { key: 'hardcover', value: 'Hardcover' },
+  { key: 'goodreads', value: 'Goodreads' },
+  { key: 'googlebooks', value: 'Google Books' },
+  { key: 'openlibrary', value: 'Open Library' },
+  { key: 'audible', value: 'Audible' },
+  { key: 'rreadingglasses', value: 'rreading-glasses' }
+];
+
 class EditAuthorModalContent extends Component {
 
   //
@@ -77,6 +86,7 @@ class EditAuthorModalContent extends Component {
       monitorNewItems,
       qualityProfileId,
       metadataProfileId,
+      metadataSource,
       path,
       tags
     } = item;
@@ -171,6 +181,21 @@ class EditAuthorModalContent extends Component {
                   />
                 </FormGroup>
             }
+
+            <FormGroup>
+              <FormLabel>
+                Metadata Source
+              </FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.SELECT}
+                name="metadataSource"
+                values={metadataSourceOptions}
+                helpText="Which provider this author's info and refreshes are pinned to. Only change this if you know the author's id under the new provider is correct - refreshes always resolve through this source, and never guess."
+                {...metadataSource}
+                onChange={onInputChange}
+              />
+            </FormGroup>
 
             <FormGroup>
               <FormLabel>

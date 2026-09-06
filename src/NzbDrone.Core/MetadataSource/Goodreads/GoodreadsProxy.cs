@@ -222,7 +222,8 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
                 TitleSlug = resource.Id.ToString(),
                 Name = resource.Name.CleanSpaces(),
                 Overview = resource.About,
-                Status = AuthorStatusType.Continuing
+                Status = AuthorStatusType.Continuing,
+                MetadataSource = "goodreads"
             };
 
             metadata.SortName = metadata.Name.ToLower();
@@ -254,7 +255,8 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             {
                 Metadata = metadata,
                 CleanName = Parser.Parser.CleanAuthorName(metadata.Name),
-                Books = books
+                Books = books,
+                Series = new List<Series>()
             };
         }
 

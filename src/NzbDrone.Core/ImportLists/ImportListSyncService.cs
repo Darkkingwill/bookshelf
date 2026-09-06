@@ -411,12 +411,19 @@ namespace NzbDrone.Core.ImportLists
 
             var monitored = importList.ShouldMonitor != ImportListMonitorType.None;
 
+            // Pin the new author to whichever source this list itself is known to use, so later
+            // refreshes resolve through that same source rather than whatever's globally
+            // configured as primary - a Goodreads-sourced id would otherwise collide with an
+            // unrelated author under a different source's id space (see AuthorMetadata.MetadataSource).
+            var metadataSource = importList.ListType == ImportListType.Goodreads ? "goodreads" : "hardcover";
+
             var toAdd = new Author
             {
                 Metadata = new AuthorMetadata
                 {
                     ForeignAuthorId = report.AuthorGoodreadsId,
-                    Name = report.Author
+                    Name = report.Author,
+                    MetadataSource = metadataSource
                 },
                 Monitored = monitored,
                 MonitorNewItems = importList.MonitorNewItems,

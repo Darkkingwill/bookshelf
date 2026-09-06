@@ -84,11 +84,13 @@ namespace NzbDrone.Core.Books
             _logger = logger;
         }
 
-        private Author GetSkyhookData(string foreignId)
+        private Author GetSkyhookData(Author author)
         {
+            var foreignId = author.ForeignAuthorId;
+
             try
             {
-                return _authorInfo.GetAuthorInfo(foreignId);
+                return _authorInfo.GetAuthorInfo(foreignId, true, author.Metadata.Value.MetadataSource);
             }
             catch (AuthorNotFoundException)
             {
@@ -352,7 +354,7 @@ namespace NzbDrone.Core.Books
             {
                 try
                 {
-                    var data = GetSkyhookData(author.ForeignAuthorId);
+                    var data = GetSkyhookData(author);
                     updated |= RefreshEntityInfo(author, null, data, true, false, null);
                 }
                 catch (Exception e)
@@ -402,7 +404,7 @@ namespace NzbDrone.Core.Books
                         try
                         {
                             LogProgress(author);
-                            var data = GetSkyhookData(author.ForeignAuthorId);
+                            var data = GetSkyhookData(author);
                             updated |= RefreshEntityInfo(author, null, data, manualTrigger, false, message.LastStartTime);
                         }
                         catch (Exception e)
