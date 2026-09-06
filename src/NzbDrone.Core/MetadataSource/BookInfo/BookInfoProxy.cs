@@ -182,7 +182,14 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             }
 
             var authorName = result.Authors?.FirstOrDefault() ?? "Unknown Author";
-            var authorForeignId = result.AuthorForeignId ?? $"{providerKey}:author:{authorName.ToLowerInvariant().Replace(" ", "-")}";
+
+            // If this author is already in the library (added via a different provider/source
+            // originally), reuse their real id instead of a fresh provider-specific one - otherwise
+            // this would try to create a colliding duplicate author record for the same person.
+            var existingAuthor = _authorService.FindByName(authorName);
+            var authorForeignId = existingAuthor?.Metadata.Value.ForeignAuthorId
+                ?? result.AuthorForeignId
+                ?? $"{providerKey}:author:{authorName.ToLowerInvariant().Replace(" ", "-")}";
 
             var authorMetadata = new AuthorMetadata
             {
@@ -1190,7 +1197,12 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         {
             var foreignId = $"{result.ProviderKey}:{result.ForeignId}";
             var authorName = result.Authors?.FirstOrDefault() ?? "Unknown Author";
-            var authorForeignId = $"{result.ProviderKey}:author:{authorName.ToLowerInvariant().Replace(" ", "-")}";
+
+            // Reuse the existing author's id if they're already in the library (see
+            // GetBookInfoFromProvider) so search results point at the same author record.
+            var existingAuthor = _authorService.FindByName(authorName);
+            var authorForeignId = existingAuthor?.Metadata.Value.ForeignAuthorId
+                ?? $"{result.ProviderKey}:author:{authorName.ToLowerInvariant().Replace(" ", "-")}";
 
             var authorMetadata = new AuthorMetadata
             {
