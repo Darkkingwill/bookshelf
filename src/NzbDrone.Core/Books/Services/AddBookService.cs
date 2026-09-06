@@ -61,8 +61,15 @@ namespace NzbDrone.Core.Books
             book.AddOptions.AddType = BookAddType.Manual;
             book.Editions.Value.Single(x => x.Monitored).ManualAdd = true;
 
-            // Add the author if necessary
-            var dbAuthor = _authorService.FindById(book.AuthorMetadata.Value.ForeignAuthorId);
+            // Add the author if necessary. The book may have come from a different metadata
+            // source than the author's existing library record (e.g. an import list using
+            // Goodreads ids for an author who was originally added via Hardcover), so also
+            // check by name before concluding this is really a brand new author - otherwise
+            // this creates a colliding duplicate, and re-fetching "new" author info can fail
+            // outright if that other source doesn't have (or can't authenticate) author data.
+            var dbAuthor = _authorService.FindById(book.AuthorMetadata.Value.ForeignAuthorId)
+                ?? _authorService.FindByName(book.AuthorMetadata.Value.Name);
+
             if (dbAuthor == null)
             {
                 var author = book.Author.Value;
