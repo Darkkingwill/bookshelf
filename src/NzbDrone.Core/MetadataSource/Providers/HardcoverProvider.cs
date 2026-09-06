@@ -231,14 +231,34 @@ namespace NzbDrone.Core.MetadataSource.Providers
                     return new List<JToken>();
                 }
 
-                var resultsStr = json["data"]?["search"]?["results"]?.Value<string>();
-                if (string.IsNullOrWhiteSpace(resultsStr))
+                var resultsToken = json["data"]?["search"]?["results"];
+                if (resultsToken == null || resultsToken.Type == JTokenType.Null)
                 {
                     return new List<JToken>();
                 }
 
-                // Results come back as a JSON string that needs to be parsed
-                var resultsJson = JObject.Parse(resultsStr);
+                // Hardcover's API has returned "results" as either a JSON-encoded
+                // string that needs re-parsing, or as an object directly - handle both.
+                JObject resultsJson;
+                if (resultsToken.Type == JTokenType.String)
+                {
+                    var resultsStr = resultsToken.Value<string>();
+                    if (string.IsNullOrWhiteSpace(resultsStr))
+                    {
+                        return new List<JToken>();
+                    }
+
+                    resultsJson = JObject.Parse(resultsStr);
+                }
+                else if (resultsToken.Type == JTokenType.Object)
+                {
+                    resultsJson = (JObject)resultsToken;
+                }
+                else
+                {
+                    return new List<JToken>();
+                }
+
                 var hits = resultsJson["hits"] as JArray;
                 return hits?.ToList() ?? new List<JToken>();
             }
