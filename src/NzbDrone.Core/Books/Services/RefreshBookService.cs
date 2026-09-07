@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using NLog;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.Books.Commands;
 using NzbDrone.Core.Books.Events;
@@ -117,20 +118,21 @@ namespace NzbDrone.Core.Books
             // under the new source. UseMetadataFrom copies the new ForeignBookId onto the local
             // record once matched, so this fallback only bites once per book, right after a
             // source switch.
+            //
+            // Exact clean-title equality alone isn't enough: confirmed live that a book added
+            // under a legacy source can have extra text baked into its stored title that the new
+            // source's clean title doesn't carry - e.g. local "Zfinity: Zombie Rules" (the series
+            // name appended) vs Goodreads' plain "Zfinity", or local "Orphan X: A Novel" vs plain
+            // "Orphan X". Neither is a real title difference, just a legacy naming convention, so
+            // fall back further to a prefix match (one clean title starts with the other) before
+            // giving up and treating it as gone.
             if (book == null)
             {
-                book = remote.FirstOrDefault(x => x.CleanTitle == local.CleanTitle);
+                book = remote.FirstOrDefault(x => x.CleanTitle == local.CleanTitle) ??
+                    remote.FirstOrDefault(x =>
+                        x.CleanTitle.IsNotNullOrWhiteSpace() && local.CleanTitle.IsNotNullOrWhiteSpace() &&
+                        (x.CleanTitle.StartsWith(local.CleanTitle) || local.CleanTitle.StartsWith(x.CleanTitle)));
             }
-
-            // TEMPORARY diagnostic logging - tracking down why one specific book per author
-            // repeatedly fails to match here and gets duplicated instead. Remove once root-caused.
-            _logger.Info(
-                "BOOK-MATCH-DEBUG local='{0}' cleanTitle='{1}' foreignId={2} shouldDelete={3} -> {4}",
-                local.Title,
-                local.CleanTitle,
-                local.ForeignBookId,
-                ShouldDelete(local),
-                book == null ? "NO MATCH in remote list" : $"matched '{book.Title}' cleanTitle='{book.CleanTitle}' foreignId={book.ForeignBookId}");
 
             if (book == null && ShouldDelete(local))
             {
@@ -141,7 +143,6 @@ namespace NzbDrone.Core.Books
             {
                 data = GetSkyhookData(local);
                 book = data?.Books?.Value?.SingleOrDefault(x => x.ForeignBookId == local.ForeignBookId);
-                _logger.Info("BOOK-MATCH-DEBUG local='{0}' fell through to GetSkyhookData -> {1}", local.Title, book == null ? "still no match" : $"found '{book.Title}' foreignId={book.ForeignBookId}");
             }
 
             result.Entity = book;

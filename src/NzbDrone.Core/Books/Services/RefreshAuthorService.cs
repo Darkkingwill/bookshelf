@@ -256,22 +256,20 @@ namespace NzbDrone.Core.Books
             // duplicate shows up under the new id - see RefreshBookService.GetRemoteData for the
             // matching fallback on that side). Match by clean title instead so this is treated as
             // the same book and updated in place, avoiding the duplicate entirely.
+            //
+            // Exact clean-title equality alone isn't enough: confirmed live that a book added
+            // under a legacy source can have extra text baked into its stored title that the new
+            // source's clean title doesn't carry - e.g. local "Zfinity: Zombie Rules" (the series
+            // name appended) vs Goodreads' plain "Zfinity", or local "Orphan X: A Novel" vs plain
+            // "Orphan X". Neither is a real title difference, just a legacy naming convention, so
+            // fall back further to a prefix match (one clean title starts with the other) before
+            // giving up and treating it as a new book.
             if (existingChild == null)
             {
-                existingChild = existingChildren.FirstOrDefault(x => x.CleanTitle == remote.CleanTitle);
-
-                // TEMPORARY diagnostic logging - tracking down why one specific book per author
-                // repeatedly fails this fallback and gets duplicated instead of matched. Remove
-                // once root-caused.
-                _logger.Info(
-                    "AUTHOR-MATCH-DEBUG remote='{0}' cleanTitle='{1}' foreignId={2} -> {3} (existingChildren titles: {4})",
-                    remote.Title,
-                    remote.CleanTitle,
-                    remote.ForeignBookId,
-                    existingChild == null
-                        ? "NO MATCH (will be treated as new/duplicate)"
-                        : $"matched '{existingChild.Title}' cleanTitle='{existingChild.CleanTitle}' foreignId={existingChild.ForeignBookId}",
-                    string.Join(" | ", existingChildren.Select(x => $"'{x.Title}'/'{x.CleanTitle}'/{x.ForeignBookId}")));
+                existingChild = existingChildren.FirstOrDefault(x => x.CleanTitle == remote.CleanTitle) ??
+                    existingChildren.FirstOrDefault(x =>
+                        x.CleanTitle.IsNotNullOrWhiteSpace() && remote.CleanTitle.IsNotNullOrWhiteSpace() &&
+                        (x.CleanTitle.StartsWith(remote.CleanTitle) || remote.CleanTitle.StartsWith(x.CleanTitle)));
             }
 
             var mergeChildren = new List<Book>();
