@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
@@ -298,8 +300,11 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             // Each entry is a distinct Goodreads book (edition), grouped/keyed by its work id
             // downstream - MapBook already returns one Book per BookResource, so just dedupe
             // in case the same work shows up more than once (e.g. multiple editions listed).
-            var books = (bookList?.List ?? new List<BookResource>())
+            var resources = (bookList?.List ?? new List<BookResource>())
                 .Where(b => b.Work != null && b.Work.Id > 0)
+                .ToList();
+
+            var books = resources
                 .Select(MapBook)
                 .DistinctBy(b => b.ForeignBookId)
                 .ToList();
@@ -311,8 +316,96 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
                 Metadata = metadata,
                 CleanName = Parser.Parser.CleanAuthorName(metadata.Name),
                 Books = books,
-                Series = new List<Series>()
+                Series = BuildSeriesFromTitles(resources, books)
             };
+        }
+
+        // Goodreads' author/show response has no separate series structure at all - verified
+        // live against the real API, despite AuthorSeriesListResource/WorkResource.SetSeriesInfo
+        // existing in this codebase for what turned out to be a different (series/show) endpoint
+        // that isn't reachable from just an author id. What IS reliable is the title convention
+        // Goodreads uses everywhere: a series entry's <title> is <title_without_series> plus a
+        // "(Series Name, #Position)" suffix - e.g. "Orphan X (Orphan X, #1)" /
+        // "Orphan X". Diffing those two already-parsed fields extracts real series membership
+        // with no extra API calls, confirmed against Gregg Hurwitz's real 10-book Orphan X
+        // series (including one entry missing the comma - "(Orphan X #8)" - hence the optional
+        // comma in the regex).
+        private static readonly Regex SeriesSuffixRegex = new Regex(@"^\((?<series>.+?),?\s*#(?<position>[\d.]+)\)$", RegexOptions.Compiled);
+
+        internal static List<Series> BuildSeriesFromTitles(List<BookResource> resources, List<Book> books)
+        {
+            var bookDict = books.ToDictionary(b => b.ForeignBookId);
+            books.ForEach(b => b.SeriesLinks = new List<SeriesBookLink>());
+
+            var seriesByForeignId = new Dictionary<string, Series>();
+
+            foreach (var resource in resources)
+            {
+                var workId = resource.Work?.Id.ToString();
+                if (workId == null || !bookDict.TryGetValue(workId, out var book))
+                {
+                    continue;
+                }
+
+                var fullTitle = resource.Title;
+                var cleanTitle = resource.TitleWithoutSeries;
+
+                if (fullTitle.IsNullOrWhiteSpace() || cleanTitle.IsNullOrWhiteSpace() || !fullTitle.StartsWith(cleanTitle))
+                {
+                    continue;
+                }
+
+                var suffix = fullTitle.Substring(cleanTitle.Length).Trim();
+                var match = SeriesSuffixRegex.Match(suffix);
+
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                var seriesName = match.Groups["series"].Value.Trim();
+                var position = match.Groups["position"].Value;
+
+                if (seriesName.IsNullOrWhiteSpace())
+                {
+                    continue;
+                }
+
+                // Prefixed and derived from the name (not a real numeric id, since Goodreads
+                // doesn't give us one this way) - keeps this id space clearly distinct so it can
+                // never collide with a real provider id from elsewhere.
+                var foreignSeriesId = "goodreads-title:" + seriesName.ToLowerInvariant();
+
+                if (!seriesByForeignId.TryGetValue(foreignSeriesId, out var series))
+                {
+                    series = new Series
+                    {
+                        ForeignSeriesId = foreignSeriesId,
+                        Title = seriesName,
+                        Numbered = true,
+                        LinkItems = new List<SeriesBookLink>()
+                    };
+                    seriesByForeignId[foreignSeriesId] = series;
+                }
+
+                double.TryParse(position, NumberStyles.Any, CultureInfo.InvariantCulture, out var seriesPosition);
+
+                var link = new SeriesBookLink
+                {
+                    Book = book,
+                    Series = series,
+                    Position = position,
+                    SeriesPosition = (int)seriesPosition
+                };
+
+                series.LinkItems.Value.Add(link);
+                book.SeriesLinks.Value.Add(link);
+            }
+
+            var result = seriesByForeignId.Values.Where(s => s.LinkItems.Value.Count > 0).ToList();
+            result.ForEach(s => s.WorkCount = s.LinkItems.Value.Count);
+
+            return result;
         }
 
         private static Book MapBook(BookResource resource)
