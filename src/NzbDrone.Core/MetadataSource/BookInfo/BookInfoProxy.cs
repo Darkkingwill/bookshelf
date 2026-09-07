@@ -105,7 +105,14 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             // shape alone - a bare number is ambiguous between providers (see the incident this
             // was built to fix: a Hardcover author id collided in value, not meaning, with an
             // unrelated real Goodreads author sharing the same number).
-            if (metadataSource.IsNotNullOrWhiteSpace())
+            //
+            // "hardcover" is deliberately excluded here: for a bare legacy id it means "whatever
+            // the primary metadata source is configured as" (the self-hosted proxy that
+            // originally assigned it), which is a DIFFERENT id space than the real Hardcover API
+            // reached via IMetadataProviderService - routing there returned a wrong, unrelated
+            // match instead of failing cleanly. Only route elsewhere for a source with its own
+            // independently-verified id space (currently just goodreads).
+            if (metadataSource.IsNotNullOrWhiteSpace() && !metadataSource.Equals("hardcover", StringComparison.OrdinalIgnoreCase))
             {
                 return GetAuthorInfoFromSource(metadataSource, foreignAuthorId);
             }
@@ -143,9 +150,9 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                 return GetBookInfoFromProvider(providerKey, rawId, foreignBookId);
             }
 
-            // Same principle as GetAuthorInfo: only take this branch when the caller explicitly
-            // knows the id's source (e.g. the book's own author is pinned to one) - never guess.
-            if (metadataSource.IsNotNullOrWhiteSpace())
+            // Same principle as GetAuthorInfo, "hardcover" exclusion included - see the comment
+            // there for why.
+            if (metadataSource.IsNotNullOrWhiteSpace() && !metadataSource.Equals("hardcover", StringComparison.OrdinalIgnoreCase))
             {
                 return GetBookInfoFromSource(metadataSource, foreignBookId);
             }
@@ -178,10 +185,13 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                 return Tuple.Create(bookAuthorMetadata.ForeignAuthorId, book, new List<AuthorMetadata> { bookAuthorMetadata });
             }
 
-            // A bare legacy id under a multi-provider source (e.g. an author pinned to
-            // "hardcover") is resolved the same way as a fallback-provider add, just keeping the
-            // existing unprefixed id instead of synthesizing a new "provider:id" one - this book
-            // already exists locally under that bare id, and refreshes must keep matching it.
+            // Any other tag reaching here (googlebooks/openlibrary/audible/rreadingglasses) means
+            // the user manually re-pinned an author who still has an old bare legacy id under
+            // that tag - resolved the same way as a fallback-provider add, keeping the existing
+            // unprefixed id instead of synthesizing a new "provider:id" one, since this book
+            // already exists locally under that bare id and refreshes must keep matching it.
+            // Best-effort: these providers were never the origin of a bare legacy id, so this
+            // will usually just fail cleanly rather than resolve.
             return GetBookInfoFromProvider(metadataSource, foreignBookId, foreignBookId);
         }
 
