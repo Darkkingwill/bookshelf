@@ -107,6 +107,21 @@ namespace NzbDrone.Core.Books
 
             var book = remote.SingleOrDefault(x => x.ForeignBookId == local.ForeignBookId);
 
+            // If the author's pinned Metadata Source changed since this book was last refreshed,
+            // its ForeignBookId is still in the OLD source's id space and will never match the
+            // newly fetched remote list by id alone - every existing book would otherwise fall
+            // through to the per-book GetSkyhookData lookup below using an id the new source has
+            // never heard of, fail with "not found", and (since nothing re-links it) break series
+            // matching downstream too. Fall back to matching by clean title - both sides go
+            // through the same title-cleaning normalization - so the book gets re-identified
+            // under the new source. UseMetadataFrom copies the new ForeignBookId onto the local
+            // record once matched, so this fallback only bites once per book, right after a
+            // source switch.
+            if (book == null)
+            {
+                book = remote.FirstOrDefault(x => x.CleanTitle == local.CleanTitle);
+            }
+
             if (book == null && ShouldDelete(local))
             {
                 return result;
