@@ -99,12 +99,22 @@ namespace NzbDrone.Core.Books
             Monitored = other.Monitored;
             MonitorNewItems = other.MonitorNewItems;
 
-            // Deliberately the one Metadata field let through here - everything else about
-            // Metadata is owned by the refresh pipeline, but this one is a user-facing setting
-            // (which provider a refresh should pin to) that has nowhere else to be edited from.
+            // Deliberately the only Metadata fields let through here - everything else about
+            // Metadata is owned by the refresh pipeline, but these are user-facing settings
+            // (which provider a refresh should pin to, and - since changing the source alone is
+            // dangerous if the existing id belongs to a different provider's id space, see the
+            // incident this was built to fix - the id to use under that provider) that have
+            // nowhere else to be edited from.
             if (other.Metadata?.Value?.MetadataSource.IsNotNullOrWhiteSpace() == true)
             {
                 Metadata.Value.MetadataSource = other.Metadata.Value.MetadataSource;
+            }
+
+            if (other.Metadata?.Value?.ForeignAuthorId.IsNotNullOrWhiteSpace() == true &&
+                other.Metadata.Value.ForeignAuthorId != Metadata.Value.ForeignAuthorId)
+            {
+                Metadata.Value.ForeignAuthorId = other.Metadata.Value.ForeignAuthorId;
+                Metadata.Value.TitleSlug = other.Metadata.Value.ForeignAuthorId;
             }
         }
     }

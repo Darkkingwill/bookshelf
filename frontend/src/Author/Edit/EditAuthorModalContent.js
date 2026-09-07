@@ -87,6 +87,7 @@ class EditAuthorModalContent extends Component {
       qualityProfileId,
       metadataProfileId,
       metadataSource,
+      foreignAuthorId,
       path,
       tags
     } = item;
@@ -191,8 +192,22 @@ class EditAuthorModalContent extends Component {
                 type={inputTypes.SELECT}
                 name="metadataSource"
                 values={metadataSourceOptions}
-                helpText="Which provider this author's info and refreshes are pinned to. Only change this if you know the author's id under the new provider is correct - refreshes always resolve through this source, and never guess."
+                helpText="Which provider this author's info and refreshes are pinned to."
                 {...metadataSource}
+                onChange={onInputChange}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>
+                Foreign Author ID
+              </FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.TEXT}
+                name="foreignAuthorId"
+                helpText="This author's id under the Metadata Source above. Changing the source alone is NOT enough and will misidentify this author on the next refresh - the id must be updated to match at the same time. Find the correct id from the provider's own site (e.g. a Goodreads author page URL is goodreads.com/author/show/<id>-name) - leave unchanged unless you have the real id for the new source."
+                {...foreignAuthorId}
                 onChange={onInputChange}
               />
             </FormGroup>
