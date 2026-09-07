@@ -19,12 +19,14 @@ import { icons, inputTypes, kinds, tooltipPositions } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import styles from './EditAuthorModalContent.css';
 
+// Audible is deliberately excluded here - its GetAuthorInfo always returns null (no
+// author-level endpoint without auth), so pinning an author to it would just make every
+// future refresh fail. It still works fine as a book-level lookup source (ASIN search/add).
 const metadataSourceOptions = [
   { key: 'hardcover', value: 'Hardcover' },
   { key: 'goodreads', value: 'Goodreads' },
   { key: 'googlebooks', value: 'Google Books' },
   { key: 'openlibrary', value: 'Open Library' },
-  { key: 'audible', value: 'Audible' },
   { key: 'rreadingglasses', value: 'rreading-glasses' }
 ];
 
@@ -206,7 +208,7 @@ class EditAuthorModalContent extends Component {
               <FormInputGroup
                 type={inputTypes.TEXT}
                 name="foreignAuthorId"
-                helpText="This author's id under the Metadata Source above. Changing the source alone is NOT enough and will misidentify this author on the next refresh - the id must be updated to match at the same time. Find the correct id from the provider's own site (e.g. a Goodreads author page URL is goodreads.com/author/show/<id>-name) - leave unchanged unless you have the real id for the new source."
+                helpText="This author's id under the Metadata Source above. Changing the source alone is NOT enough and will misidentify this author on the next refresh - the id must be updated to match at the same time. Goodreads: the number from the author page URL (goodreads.com/author/show/<id>-name). Open Library: the author key from their page URL (e.g. OL34184A), or their exact name if you don't have it. Google Books: there is no id - use their exact name. Leave unchanged unless you have the right value for the new source."
                 {...foreignAuthorId}
                 onChange={onInputChange}
               />
