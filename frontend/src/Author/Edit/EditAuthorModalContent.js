@@ -215,7 +215,7 @@ class EditAuthorModalContent extends Component {
               />
 
               <AuthorSourceIdLookup
-                metadataSource={metadataSource.value}
+                metadataSource={metadataSource?.value}
                 authorName={authorName}
                 onSelect={(value) => onInputChange({ name: 'foreignAuthorId', value })}
               />
