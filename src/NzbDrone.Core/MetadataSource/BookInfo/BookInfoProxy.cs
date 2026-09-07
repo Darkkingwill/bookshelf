@@ -136,11 +136,18 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             return null;
         }
 
-        public Tuple<string, Book, List<AuthorMetadata>> GetBookInfo(string foreignBookId)
+        public Tuple<string, Book, List<AuthorMetadata>> GetBookInfo(string foreignBookId, string metadataSource = null)
         {
             if (TryParseProviderForeignId(foreignBookId, out var providerKey, out var rawId))
             {
                 return GetBookInfoFromProvider(providerKey, rawId, foreignBookId);
+            }
+
+            // Same principle as GetAuthorInfo: only take this branch when the caller explicitly
+            // knows the id's source (e.g. the book's own author is pinned to one) - never guess.
+            if (metadataSource.IsNotNullOrWhiteSpace())
+            {
+                return GetBookInfoFromSource(metadataSource, foreignBookId);
             }
 
             try
@@ -152,6 +159,30 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                 _logger.Warn(e, "Unexpected error getting book info: {foreignBookId}", foreignBookId);
                 throw;
             }
+        }
+
+        private Tuple<string, Book, List<AuthorMetadata>> GetBookInfoFromSource(string metadataSource, string foreignBookId)
+        {
+            if (metadataSource.Equals("goodreads", StringComparison.OrdinalIgnoreCase))
+            {
+                var book = _goodreadsProxy.GetBookInfo(foreignBookId);
+
+                if (book?.AuthorMetadata?.Value == null)
+                {
+                    throw new BookNotFoundException(foreignBookId);
+                }
+
+                var bookAuthorMetadata = book.AuthorMetadata.Value;
+                bookAuthorMetadata.MetadataSource = "goodreads";
+
+                return Tuple.Create(bookAuthorMetadata.ForeignAuthorId, book, new List<AuthorMetadata> { bookAuthorMetadata });
+            }
+
+            // A bare legacy id under a multi-provider source (e.g. an author pinned to
+            // "hardcover") is resolved the same way as a fallback-provider add, just keeping the
+            // existing unprefixed id instead of synthesizing a new "provider:id" one - this book
+            // already exists locally under that bare id, and refreshes must keep matching it.
+            return GetBookInfoFromProvider(metadataSource, foreignBookId, foreignBookId);
         }
 
         // Book/author IDs sourced from a fallback metadata provider are synthesized as

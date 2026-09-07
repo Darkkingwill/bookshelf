@@ -80,8 +80,9 @@ namespace NzbDrone.Core.Books
         {
             try
             {
-                var tuple = _bookInfo.GetBookInfo(book.ForeignBookId);
-                var author = _authorInfo.GetAuthorInfo(tuple.Item1);
+                var metadataSource = book.Author.Value.Metadata.Value.MetadataSource;
+                var tuple = _bookInfo.GetBookInfo(book.ForeignBookId, metadataSource);
+                var author = _authorInfo.GetAuthorInfo(tuple.Item1, true, metadataSource);
                 var newbook = tuple.Item2;
 
                 newbook.Author = author;

@@ -115,7 +115,13 @@ namespace NzbDrone.Core.Books
             Tuple<string, Book, List<AuthorMetadata>> tuple = null;
             try
             {
-                tuple = _bookInfo.GetBookInfo(newBook.ForeignBookId);
+                // If the author's already known (e.g. this book came in alongside an
+                // already-resolved author from an import list), route through their pinned
+                // source rather than whatever's globally configured - a bare legacy id is
+                // otherwise ambiguous between providers. Safe to leave null (falls back to the
+                // prior behavior unchanged) when Author isn't populated yet.
+                var metadataSource = newBook.Author?.Value?.Metadata?.Value?.MetadataSource;
+                tuple = _bookInfo.GetBookInfo(newBook.ForeignBookId, metadataSource);
             }
             catch (BookNotFoundException)
             {
