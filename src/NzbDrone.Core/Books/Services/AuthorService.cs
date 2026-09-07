@@ -240,9 +240,12 @@ namespace NzbDrone.Core.Books
             // above only persists the former. Metadata is normally only ever written by the
             // refresh pipeline, but a couple of fields (MetadataSource, ForeignAuthorId) are
             // user-editable from here too, so make sure an edit that touched them actually saves.
+            // This must be a keyed Update, not Upsert - Upsert matches by ForeignAuthorId, which
+            // is exactly the field we may be changing, so it would insert an orphaned row instead
+            // of updating the one this author's AuthorMetadataId already points to.
             if (author.Metadata?.Value != null)
             {
-                _authorMetadataService.Upsert(author.Metadata.Value);
+                _authorMetadataService.Update(author.Metadata.Value);
             }
 
             _eventAggregator.PublishEvent(new AuthorEditedEvent(updatedAuthor, storedAuthor));
