@@ -16,6 +16,7 @@ namespace NzbDrone.Core.MetadataSource.Providers
     {
         List<MetadataSearchResult> SearchBooks(string query);
         List<MetadataSearchResult> SearchAuthors(string query);
+        List<MetadataSearchResult> SearchAuthors(string providerKey, string query);
         MetadataSearchResult SearchByIsbn(string isbn);
         MetadataSearchResult SearchByAsin(string asin);
         MetadataAuthorResult GetAuthorInfo(string providerKey, string foreignId);
@@ -172,6 +173,29 @@ namespace NzbDrone.Core.MetadataSource.Providers
             }
 
             return FuzzyMatcher.RankResults(allResults, query, 0.2);
+        }
+
+        // Unlike the fallback-across-all-providers overload above, this searches exactly one
+        // named provider and nothing else - used when the caller needs a real id from that
+        // specific provider's own id space (e.g. looking up what id to pin an author to).
+        public List<MetadataSearchResult> SearchAuthors(string providerKey, string query)
+        {
+            var provider = ResolveProvider(providerKey);
+
+            if (provider == null)
+            {
+                return new List<MetadataSearchResult>();
+            }
+
+            try
+            {
+                return provider.SearchAuthors(query) ?? new List<MetadataSearchResult>();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "SearchAuthors failed for provider {0}", providerKey);
+                return new List<MetadataSearchResult>();
+            }
         }
 
         public MetadataSearchResult SearchByIsbn(string isbn)

@@ -119,8 +119,10 @@ namespace NzbDrone.Core.MetadataSource.Providers
 
         public List<MetadataSearchResult> SearchAuthors(string query)
         {
-            // The rreading-glasses search endpoint returns book/work/author IDs.
-            // We extract unique author IDs and return them.
+            // The rreading-glasses search endpoint returns book/work/author IDs but no
+            // author name - fetch each unique candidate's real name via GetAuthorInfo so
+            // callers (e.g. an author-id lookup UI) have something meaningful to show,
+            // falling back to a placeholder only if that lookup fails.
             var bookResults = SearchBooks(query);
 
             var authorIds = bookResults
@@ -129,15 +131,28 @@ namespace NzbDrone.Core.MetadataSource.Providers
                 .Distinct()
                 .ToList();
 
-            return authorIds.Select(id => new MetadataSearchResult
+            return authorIds.Select(id =>
             {
-                ForeignId = id,
-                ProviderKey = Key,
-                Title = $"Author {id}",
-                ExternalIds = new Dictionary<string, string>
+                string name = null;
+                try
                 {
-                    { "goodreads_author", id }
+                    name = GetAuthorInfo(id)?.Name;
                 }
+                catch (Exception ex)
+                {
+                    _logger.Debug(ex, "Could not enrich rreading-glasses author {0} with a name", id);
+                }
+
+                return new MetadataSearchResult
+                {
+                    ForeignId = id,
+                    ProviderKey = Key,
+                    Title = name ?? $"Author {id}",
+                    ExternalIds = new Dictionary<string, string>
+                    {
+                        { "goodreads_author", id }
+                    }
+                };
             }).ToList();
         }
 

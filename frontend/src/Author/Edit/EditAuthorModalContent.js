@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import AuthorMetadataProfilePopoverContent from 'AddAuthor/AuthorMetadataProfilePopoverContent';
 import AuthorMonitorNewItemsOptionsPopoverContent from 'AddAuthor/AuthorMonitorNewItemsOptionsPopoverContent';
+import AuthorSourceIdLookup from 'Author/Edit/AuthorSourceIdLookup';
 import MoveAuthorModal from 'Author/MoveAuthor/MoveAuthorModal';
 import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
@@ -211,6 +212,12 @@ class EditAuthorModalContent extends Component {
                 helpText="This author's id under the Metadata Source above. Changing the source alone is NOT enough and will misidentify this author on the next refresh - the id must be updated to match at the same time. Goodreads: the number from the author page URL (goodreads.com/author/show/<id>-name). Open Library: the author key from their page URL (e.g. OL34184A), or their exact name if you don't have it. Google Books: there is no id - use their exact name. Leave unchanged unless you have the right value for the new source."
                 {...foreignAuthorId}
                 onChange={onInputChange}
+              />
+
+              <AuthorSourceIdLookup
+                metadataSource={metadataSource.value}
+                authorName={authorName}
+                onSelect={(value) => onInputChange({ name: 'foreignAuthorId', value })}
               />
             </FormGroup>
 

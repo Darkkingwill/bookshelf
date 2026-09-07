@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Xml.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
@@ -12,10 +13,17 @@ using NzbDrone.Core.Http;
 
 namespace NzbDrone.Core.MetadataSource.Goodreads
 {
+    public class GoodreadsAuthorSearchResult
+    {
+        public string ForeignAuthorId { get; set; }
+        public string Name { get; set; }
+    }
+
     public interface IGoodreadsProxy
     {
         Book GetBookInfo(string foreignEditionId);
         Author GetAuthorInfo(long foreignAuthorId, bool useCache = false);
+        GoodreadsAuthorSearchResult SearchAuthorByName(string name);
     }
 
     public class GoodreadsProxy : IGoodreadsProxy, IProvideSeriesInfo, IProvideListInfo
@@ -104,6 +112,54 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             }
 
             return MapAuthorShow(authorResource, bookList);
+        }
+
+        // Uses Goodreads' api_author_link method (GET api/author_url/<name>), which resolves
+        // a name straight to its canonical author id/page - a single best match, not a fuzzy
+        // list. Verified live: returns HTTP 200 with an empty <GoodreadsResponse/> (no <author>
+        // element) rather than a 404 when nothing matches, so that has to be checked explicitly
+        // rather than relying on HasHttpError.
+        public GoodreadsAuthorSearchResult SearchAuthorByName(string name)
+        {
+            _logger.Debug("Searching Goodreads for author name {0}", name);
+
+            var httpRequest = _requestBuilder.Create()
+                .SetSegment("route", $"api/author_url/{Uri.EscapeDataString(name)}")
+                .Build();
+
+            httpRequest.AllowAutoRedirect = true;
+            httpRequest.SuppressHttpError = true;
+
+            var httpResponse = _cachedHttpClient.Get(httpRequest, false, TimeSpan.FromHours(1));
+
+            if (httpResponse.HasHttpError)
+            {
+                return null;
+            }
+
+            XDocument document;
+            try
+            {
+                document = XDocument.Parse(httpResponse.Content);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
+            var authorElement = document.Root?.Element("author");
+            var id = authorElement?.Attribute("id")?.Value;
+
+            if (id.IsNullOrWhiteSpace())
+            {
+                return null;
+            }
+
+            return new GoodreadsAuthorSearchResult
+            {
+                ForeignAuthorId = id,
+                Name = authorElement.Element("name")?.Value?.Trim()
+            };
         }
 
         public ListResource GetListInfo(int foreignListId, int page, bool useCache = true)
