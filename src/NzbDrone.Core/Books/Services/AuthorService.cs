@@ -36,18 +36,21 @@ namespace NzbDrone.Core.Books
     public class AuthorService : IAuthorService
     {
         private readonly IAuthorRepository _authorRepository;
+        private readonly IAuthorMetadataService _authorMetadataService;
         private readonly IEventAggregator _eventAggregator;
         private readonly IBuildAuthorPaths _authorPathBuilder;
         private readonly Logger _logger;
         private readonly ICached<List<Author>> _cache;
 
         public AuthorService(IAuthorRepository authorRepository,
+                             IAuthorMetadataService authorMetadataService,
                              IEventAggregator eventAggregator,
                              IBuildAuthorPaths authorPathBuilder,
                              ICacheManager cacheManager,
                              Logger logger)
         {
             _authorRepository = authorRepository;
+            _authorMetadataService = authorMetadataService;
             _eventAggregator = eventAggregator;
             _authorPathBuilder = authorPathBuilder;
             _cache = cacheManager.GetRollingCache<List<Author>>(GetType(), "authorcache", TimeSpan.FromSeconds(30));
@@ -232,6 +235,16 @@ namespace NzbDrone.Core.Books
             author.AddOptions = storedAuthor.AddOptions;
 
             var updatedAuthor = _authorRepository.Update(author);
+
+            // The Authors table row and the AuthorMetadata row are separate entities - Update
+            // above only persists the former. Metadata is normally only ever written by the
+            // refresh pipeline, but a couple of fields (MetadataSource, ForeignAuthorId) are
+            // user-editable from here too, so make sure an edit that touched them actually saves.
+            if (author.Metadata?.Value != null)
+            {
+                _authorMetadataService.Upsert(author.Metadata.Value);
+            }
+
             _eventAggregator.PublishEvent(new AuthorEditedEvent(updatedAuthor, storedAuthor));
 
             return updatedAuthor;
