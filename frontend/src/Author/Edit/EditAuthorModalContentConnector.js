@@ -42,6 +42,8 @@ function createMapStateToProps() {
         'monitorNewItems',
         'qualityProfileId',
         'metadataProfileId',
+        'metadataSource',
+        'foreignAuthorId',
         'path',
         'tags'
       ]);
