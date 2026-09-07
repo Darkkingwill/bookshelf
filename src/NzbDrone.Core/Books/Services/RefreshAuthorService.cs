@@ -246,6 +246,21 @@ namespace NzbDrone.Core.Books
         protected override Tuple<Book, List<Book>> GetMatchingExistingChildren(List<Book> existingChildren, Book remote)
         {
             var existingChild = existingChildren.SingleOrDefault(x => x.ForeignBookId == remote.ForeignBookId);
+
+            // If the author's pinned Metadata Source changed since this book was last refreshed,
+            // every existing book's ForeignBookId is still in the OLD source's id space and will
+            // never match the newly fetched remote list by id alone - without this fallback every
+            // one of them gets classified as "not matched", so the real remote book gets inserted
+            // as a brand new duplicate row instead of updating the existing one (which then either
+            // limps along failing its own per-book refresh, or gets merged/deleted once the
+            // duplicate shows up under the new id - see RefreshBookService.GetRemoteData for the
+            // matching fallback on that side). Match by clean title instead so this is treated as
+            // the same book and updated in place, avoiding the duplicate entirely.
+            if (existingChild == null)
+            {
+                existingChild = existingChildren.FirstOrDefault(x => x.CleanTitle == remote.CleanTitle);
+            }
+
             var mergeChildren = new List<Book>();
             return Tuple.Create(existingChild, mergeChildren);
         }

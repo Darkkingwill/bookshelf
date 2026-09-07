@@ -419,7 +419,18 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
                 CleanTitle = Parser.Parser.CleanAuthorName(title),
                 TitleSlug = resource.Work.Id.ToString(),
                 ReleaseDate = resource.Work.OriginalPublicationDate ?? resource.PublicationDate,
-                Ratings = new Ratings { Votes = resource.Work.RatingsCount, Value = resource.Work.AverageRating },
+
+                // Goodreads' author/show response embeds <work> as a near-empty stub (just id
+                // and uri) - its own ratings fields are always 0 here. The real, populated
+                // ratings live on the book/edition element itself. Using Work's meant every
+                // Goodreads-sourced book computed Ratings.Popularity (Value * Votes) as exactly
+                // 0, so Metadata Profiles with any popularity floor (the "Standard" default is
+                // 50) silently filtered out every single book for every Goodreads-pinned author,
+                // bestsellers included - confirmed live against Gregg Hurwitz's real feed, where
+                // this made an author-level refresh discover zero books, insert nothing, and
+                // (via RefreshSeriesService's own safe-guard for the reverse case not covering
+                // this one) delete his one existing series link down to zero.
+                Ratings = new Ratings { Votes = resource.RatingsCount, Value = resource.AverageRating },
                 AnyEditionOk = true
             };
 
