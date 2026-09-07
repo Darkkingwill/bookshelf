@@ -122,6 +122,16 @@ namespace NzbDrone.Core.Books
                 book = remote.FirstOrDefault(x => x.CleanTitle == local.CleanTitle);
             }
 
+            // TEMPORARY diagnostic logging - tracking down why one specific book per author
+            // repeatedly fails to match here and gets duplicated instead. Remove once root-caused.
+            _logger.Info(
+                "BOOK-MATCH-DEBUG local='{0}' cleanTitle='{1}' foreignId={2} shouldDelete={3} -> {4}",
+                local.Title,
+                local.CleanTitle,
+                local.ForeignBookId,
+                ShouldDelete(local),
+                book == null ? "NO MATCH in remote list" : $"matched '{book.Title}' cleanTitle='{book.CleanTitle}' foreignId={book.ForeignBookId}");
+
             if (book == null && ShouldDelete(local))
             {
                 return result;
@@ -131,6 +141,7 @@ namespace NzbDrone.Core.Books
             {
                 data = GetSkyhookData(local);
                 book = data?.Books?.Value?.SingleOrDefault(x => x.ForeignBookId == local.ForeignBookId);
+                _logger.Info("BOOK-MATCH-DEBUG local='{0}' fell through to GetSkyhookData -> {1}", local.Title, book == null ? "still no match" : $"found '{book.Title}' foreignId={book.ForeignBookId}");
             }
 
             result.Entity = book;

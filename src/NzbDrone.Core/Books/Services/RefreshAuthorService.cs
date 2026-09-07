@@ -259,6 +259,19 @@ namespace NzbDrone.Core.Books
             if (existingChild == null)
             {
                 existingChild = existingChildren.FirstOrDefault(x => x.CleanTitle == remote.CleanTitle);
+
+                // TEMPORARY diagnostic logging - tracking down why one specific book per author
+                // repeatedly fails this fallback and gets duplicated instead of matched. Remove
+                // once root-caused.
+                _logger.Info(
+                    "AUTHOR-MATCH-DEBUG remote='{0}' cleanTitle='{1}' foreignId={2} -> {3} (existingChildren titles: {4})",
+                    remote.Title,
+                    remote.CleanTitle,
+                    remote.ForeignBookId,
+                    existingChild == null
+                        ? "NO MATCH (will be treated as new/duplicate)"
+                        : $"matched '{existingChild.Title}' cleanTitle='{existingChild.CleanTitle}' foreignId={existingChild.ForeignBookId}",
+                    string.Join(" | ", existingChildren.Select(x => $"'{x.Title}'/'{x.CleanTitle}'/{x.ForeignBookId}")));
             }
 
             var mergeChildren = new List<Book>();
