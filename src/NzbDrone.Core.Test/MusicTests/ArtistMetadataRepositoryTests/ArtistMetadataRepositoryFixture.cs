@@ -24,6 +24,26 @@ namespace NzbDrone.Core.Test.MusicTests.AuthorRepositoryTests
         }
 
         [Test]
+        public void update_should_change_existing_row_by_id_even_when_foreign_author_id_changes()
+        {
+            var inserted = _authorMetadataRepo.Insert(Builder<AuthorMetadata>.CreateNew()
+                .With(x => x.Id = 0)
+                .With(x => x.ForeignAuthorId = "111")
+                .With(x => x.MetadataSource = "hardcover")
+                .Build());
+
+            inserted.ForeignAuthorId = "222";
+            inserted.MetadataSource = "goodreads";
+
+            _authorMetadataRepo.Update(inserted);
+
+            var stored = _authorMetadataRepo.Get(inserted.Id);
+            stored.ForeignAuthorId.Should().Be("222");
+            stored.MetadataSource.Should().Be("goodreads");
+            AllStoredModels.Should().HaveCount(1);
+        }
+
+        [Test]
         public void upsert_many_should_insert_list_of_new()
         {
             var updated = _authorMetadataRepo.UpsertMany(_metadataList);

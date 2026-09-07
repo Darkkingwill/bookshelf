@@ -181,7 +181,6 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             var resource = httpResponse.Deserialize<BookResource>();
 
             var book = MapBook(resource);
-            book.CleanTitle = Parser.Parser.CleanAuthorName(book.Title);
 
             var authors = resource.Authors.SelectList(MapAuthor);
             book.AuthorMetadata = authors.First();
@@ -262,10 +261,13 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
 
         private static Book MapBook(BookResource resource)
         {
+            var title = (resource.Work.OriginalTitle ?? resource.TitleWithoutSeries).CleanSpaces();
+
             var book = new Book
             {
                 ForeignBookId = resource.Work.Id.ToString(),
-                Title = (resource.Work.OriginalTitle ?? resource.TitleWithoutSeries).CleanSpaces(),
+                Title = title,
+                CleanTitle = Parser.Parser.CleanAuthorName(title),
                 TitleSlug = resource.Work.Id.ToString(),
                 ReleaseDate = resource.Work.OriginalPublicationDate ?? resource.PublicationDate,
                 Ratings = new Ratings { Votes = resource.Work.RatingsCount, Value = resource.Work.AverageRating },
