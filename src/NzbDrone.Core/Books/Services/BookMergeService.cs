@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using NLog;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.History;
@@ -44,7 +45,7 @@ namespace NzbDrone.Core.Books
         {
             if (sourceBookIds.Contains(targetBookId))
             {
-                throw new BadRequestException("Target book cannot also be one of the source books");
+                throw new NzbDroneClientException(HttpStatusCode.BadRequest, "Target book cannot also be one of the source books");
             }
 
             var target = _bookService.GetBook(targetBookId);
@@ -52,7 +53,7 @@ namespace NzbDrone.Core.Books
 
             if (sourceBooks.Any(x => x.AuthorMetadataId != target.AuthorMetadataId))
             {
-                throw new BadRequestException("All books being merged must belong to the same author");
+                throw new NzbDroneClientException(HttpStatusCode.BadRequest, "All books being merged must belong to the same author");
             }
 
             var targetEditions = _editionService.GetEditionsByBook(targetBookId);
