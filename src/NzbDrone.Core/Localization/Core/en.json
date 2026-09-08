@@ -404,6 +404,7 @@
   "General": "General",
   "GeneralSettings": "General Settings",
   "GeneralSettingsSummary": "Port, SSL, username/password, proxy, and updates",
+  "GoodreadsApiKeyHealthCheckMessage": "Goodreads rejected the API key (401). Metadata refreshes for Goodreads-sourced authors and books will fail until this is fixed.",
   "Global": "Global",
   "GoToAuthorListing": "Go to author listing",
   "GoToInterp": "Go to {0}",

@@ -31,13 +31,16 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
     public class GoodreadsProxy : IGoodreadsProxy, IProvideSeriesInfo, IProvideListInfo
     {
         private readonly ICachedHttpResponseService _cachedHttpClient;
+        private readonly IGoodreadsRateLimiter _rateLimiter;
         private readonly Logger _logger;
         private readonly IHttpRequestBuilderFactory _requestBuilder;
 
         public GoodreadsProxy(ICachedHttpResponseService cachedHttpClient,
+                              IGoodreadsRateLimiter rateLimiter,
                               Logger logger)
         {
             _cachedHttpClient = cachedHttpClient;
+            _rateLimiter = rateLimiter;
             _logger = logger;
 
             _requestBuilder = new HttpRequestBuilder("https://www.goodreads.com/{route}")
@@ -46,6 +49,33 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
                 .SetHeader("User-Agent", "Dalvik/1.6.0 (Linux; U; Android 4.1.2; GT-I9100 Build/JZO54K)")
                 .KeepAlive()
                 .CreateFactory();
+        }
+
+        // Every Goodreads call funnels through here so rate limiting and the 401/403
+        // distinction apply uniformly, regardless of which method or cache duration is
+        // involved. Checked before each method's own status-code handling, since neither
+        // "rate-limited" nor "key rejected" is specific to any one endpoint.
+        private HttpResponse Execute(HttpRequest httpRequest, bool useCache, TimeSpan ttl)
+        {
+            _rateLimiter.WaitForSlot();
+
+            var httpResponse = _cachedHttpClient.Get(httpRequest, useCache, ttl);
+
+            if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _rateLimiter.RecordRateLimited();
+                throw new GoodreadsRateLimitedException(httpRequest);
+            }
+
+            if (httpResponse.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _rateLimiter.RecordApiKeyRejected();
+                throw new GoodreadsApiKeyException(httpRequest);
+            }
+
+            _rateLimiter.RecordSuccess();
+
+            return httpResponse;
         }
 
         public SeriesResource GetSeriesInfo(int foreignSeriesId, bool useCache = false)
@@ -60,7 +90,7 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             httpRequest.AllowAutoRedirect = true;
             httpRequest.SuppressHttpError = true;
 
-            var httpResponse = _cachedHttpClient.Get(httpRequest, useCache, TimeSpan.FromDays(7));
+            var httpResponse = Execute(httpRequest, useCache, TimeSpan.FromDays(7));
 
             if (httpResponse.HasHttpError)
             {
@@ -91,7 +121,7 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             httpRequest.AllowAutoRedirect = true;
             httpRequest.SuppressHttpError = true;
 
-            var httpResponse = _cachedHttpClient.Get(httpRequest, useCache, TimeSpan.FromDays(1));
+            var httpResponse = Execute(httpRequest, useCache, TimeSpan.FromDays(1));
 
             if (httpResponse.HasHttpError)
             {
@@ -132,7 +162,7 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             httpRequest.AllowAutoRedirect = true;
             httpRequest.SuppressHttpError = true;
 
-            var httpResponse = _cachedHttpClient.Get(httpRequest, false, TimeSpan.FromHours(1));
+            var httpResponse = Execute(httpRequest, false, TimeSpan.FromHours(1));
 
             if (httpResponse.HasHttpError)
             {
@@ -189,7 +219,7 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             httpRequest.AllowAutoRedirect = true;
             httpRequest.SuppressHttpError = true;
 
-            var httpResponse = _cachedHttpClient.Get(httpRequest, useCache, TimeSpan.FromDays(7));
+            var httpResponse = Execute(httpRequest, useCache, TimeSpan.FromDays(7));
 
             if (httpResponse.HasHttpError)
             {
@@ -218,7 +248,7 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             httpRequest.AllowAutoRedirect = true;
             httpRequest.SuppressHttpError = true;
 
-            var httpResponse = _cachedHttpClient.Get(httpRequest, false, TimeSpan.FromDays(90));
+            var httpResponse = Execute(httpRequest, false, TimeSpan.FromDays(90));
 
             if (httpResponse.HasHttpError)
             {
