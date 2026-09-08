@@ -20,6 +20,9 @@ namespace Readarr.Api.V1.Series
         public string PositionOverride { get; set; }
         public bool? IsPrimaryOverride { get; set; }
 
+        // Manually created/kept links are pinned so a refresh never deletes them.
+        public bool Pinned { get; set; }
+
         // What will actually be used when building file/folder names, after overrides are applied.
         public string EffectiveTitle { get; set; }
         public string EffectivePosition { get; set; }
@@ -47,6 +50,7 @@ namespace Readarr.Api.V1.Series
                 TitleOverride = model.TitleOverride,
                 PositionOverride = model.PositionOverride,
                 IsPrimaryOverride = model.IsPrimaryOverride,
+                Pinned = model.Pinned,
                 EffectiveTitle = model.TitleOverride.IsNotNullOrWhiteSpace() ? model.TitleOverride : model.Series?.Value?.Title,
                 EffectivePosition = model.PositionOverride.IsNotNullOrWhiteSpace() ? model.PositionOverride : model.Position,
                 EffectiveIsPrimary = model.IsPrimaryOverride ?? model.IsPrimary
@@ -63,6 +67,7 @@ namespace Readarr.Api.V1.Series
             model.TitleOverride = resource.TitleOverride;
             model.PositionOverride = resource.PositionOverride;
             model.IsPrimaryOverride = resource.IsPrimaryOverride;
+            model.Pinned = resource.Pinned;
         }
     }
 }

@@ -16,6 +16,10 @@ namespace NzbDrone.Core.Books
         public string PositionOverride { get; set; }
         public bool? IsPrimaryOverride { get; set; }
 
+        // A manually created/kept link. Refresh will never delete this even if the metadata
+        // provider stops reporting it, so a user's manual fix survives future refreshes.
+        public bool Pinned { get; set; }
+
         [MemberwiseEqualityIgnore]
         public LazyLoaded<Series> Series { get; set; }
         [MemberwiseEqualityIgnore]

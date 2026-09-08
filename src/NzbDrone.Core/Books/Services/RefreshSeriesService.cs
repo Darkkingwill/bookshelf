@@ -93,6 +93,11 @@ namespace NzbDrone.Core.Books
             return _linkService.GetLinksBySeriesAndAuthor(entity.Id, entity.ForeignAuthorId);
         }
 
+        protected override bool IsChildPinned(SeriesBookLink local)
+        {
+            return local.Pinned;
+        }
+
         protected override Tuple<SeriesBookLink, List<SeriesBookLink>> GetMatchingExistingChildren(List<SeriesBookLink> existingChildren, SeriesBookLink remote)
         {
             var existingChild = existingChildren.SingleOrDefault(x => x.BookId == remote.Book.Value.Id);

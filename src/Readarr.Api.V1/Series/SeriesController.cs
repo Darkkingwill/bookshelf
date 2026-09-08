@@ -53,5 +53,32 @@ namespace Readarr.Api.V1.Series
 
             return updated.ToResource();
         }
+
+        [HttpPost("link")]
+        public SeriesBookLinkResource CreateLink([FromBody]SeriesBookLinkResource resource)
+        {
+            var link = new SeriesBookLink
+            {
+                SeriesId = resource.SeriesId,
+                BookId = resource.BookId,
+                Position = resource.Position,
+                SeriesPosition = resource.SeriesPosition,
+                IsPrimary = resource.IsPrimary,
+
+                // Manually created, so it must survive future refreshes even if the
+                // metadata source never reports this book under this series.
+                Pinned = true
+            };
+
+            var created = _seriesBookLinkService.Insert(link);
+
+            return created.ToResource();
+        }
+
+        [HttpDelete("link/{id:int}")]
+        public void DeleteLink(int id)
+        {
+            _seriesBookLinkService.Delete(id);
+        }
     }
 }

@@ -69,6 +69,13 @@ namespace NzbDrone.Core.Books
             return true;
         }
 
+        // Override to protect a local child from being deleted just because the remote source
+        // no longer reports it (e.g. a user-pinned manual link).
+        protected virtual bool IsChildPinned(TChild local)
+        {
+            return false;
+        }
+
         protected abstract UpdateResult UpdateEntity(TEntity local, TEntity remote);
 
         protected virtual UpdateResult MoveEntity(TEntity local, TEntity remote)
@@ -267,6 +274,15 @@ namespace NzbDrone.Core.Books
                         sortedChildren.Deleted.Remove(child);
                     }
                 }
+            }
+
+            // Pinned children survive even when the remote source stops reporting them - move
+            // them out of Deleted so they're left alone instead of being wiped by this refresh.
+            var preserved = sortedChildren.Deleted.Where(IsChildPinned).ToList();
+            if (preserved.Any())
+            {
+                sortedChildren.Deleted.RemoveAll(x => preserved.Contains(x));
+                sortedChildren.UpToDate.AddRange(preserved);
             }
 
             if (typeof(TChild) != typeof(object))
