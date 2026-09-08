@@ -24,6 +24,8 @@ export const defaultState = {
   saveError: null,
   isDeleting: false,
   deleteError: null,
+  isMerging: false,
+  mergeError: null,
   sortKey: 'title',
   sortDirection: sortDirections.ASCENDING,
   secondarySortKey: 'title',
@@ -303,6 +305,7 @@ export const SET_BOOK_BANNER_OPTION = 'bookIndex/setBookBannerOption';
 export const SET_BOOK_OVERVIEW_OPTION = 'bookIndex/setBookOverviewOption';
 export const SAVE_BOOK_EDITOR = 'bookEditor/saveBookEditor';
 export const BULK_DELETE_BOOK = 'bookEditor/bulkDeleteBook';
+export const MERGE_BOOKS = 'bookEditor/mergeBooks';
 
 //
 // Action Creators
@@ -316,6 +319,7 @@ export const setBookBannerOption = createAction(SET_BOOK_BANNER_OPTION);
 export const setBookOverviewOption = createAction(SET_BOOK_OVERVIEW_OPTION);
 export const saveBookEditor = createThunk(SAVE_BOOK_EDITOR);
 export const bulkDeleteBook = createThunk(BULK_DELETE_BOOK);
+export const mergeBooks = createThunk(MERGE_BOOKS);
 
 //
 // Action Handlers
@@ -389,6 +393,38 @@ export const actionHandlers = handleThunks({
         section,
         isDeleting: false,
         deleteError: xhr
+      }));
+    });
+  },
+
+  [MERGE_BOOKS]: function(getState, payload, dispatch) {
+    dispatch(set({
+      section,
+      isMerging: true
+    }));
+
+    const promise = createAjaxRequest({
+      url: '/book/merge',
+      method: 'POST',
+      data: JSON.stringify(payload),
+      dataType: 'json'
+    }).request;
+
+    promise.done(() => {
+      // SignalR will take care of removing the merged-away books and updating the target
+
+      dispatch(set({
+        section,
+        isMerging: false,
+        mergeError: null
+      }));
+    });
+
+    promise.fail((xhr) => {
+      dispatch(set({
+        section,
+        isMerging: false,
+        mergeError: xhr
       }));
     });
   }

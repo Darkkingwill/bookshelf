@@ -36,12 +36,14 @@ namespace Readarr.Api.V1.Books
         protected readonly IEditionService _editionService;
         protected readonly IAddBookService _addBookService;
         protected readonly IMediaFileService _mediaFileService;
+        protected readonly IBookMergeService _bookMergeService;
 
         public BookController(IAuthorService authorService,
                           IBookService bookService,
                           IAddBookService addBookService,
                           IEditionService editionService,
                           IMediaFileService mediaFileService,
+                          IBookMergeService bookMergeService,
                           ISeriesBookLinkService seriesBookLinkService,
                           IAuthorStatisticsService authorStatisticsService,
                           IMapCoversToLocal coverMapper,
@@ -56,6 +58,7 @@ namespace Readarr.Api.V1.Books
             _editionService = editionService;
             _addBookService = addBookService;
             _mediaFileService = mediaFileService;
+            _bookMergeService = bookMergeService;
 
             PostValidator.RuleFor(s => s.ForeignBookId).NotEmpty();
             PostValidator.RuleFor(s => s.Author.QualityProfileId).SetValidator(qualityProfileExistsValidator);
@@ -196,6 +199,16 @@ namespace Readarr.Api.V1.Books
         public void DeleteBook(int id, bool deleteFiles = false, bool addImportListExclusion = false)
         {
             _bookService.DeleteBook(id, deleteFiles, addImportListExclusion);
+        }
+
+        [HttpPost("merge")]
+        public IActionResult MergeBooks([FromBody]MergeBooksResource resource)
+        {
+            _bookMergeService.MergeBooks(resource.TargetBookId, resource.SourceBookIds);
+
+            BroadcastResourceChange(ModelAction.Updated, resource.TargetBookId);
+
+            return Accepted(MapToResource(_bookService.GetBook(resource.TargetBookId), true));
         }
 
         [HttpPut("monitor")]

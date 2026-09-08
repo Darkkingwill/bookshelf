@@ -73,6 +73,15 @@ class BookFileActionsCell extends Component {
         {
           path &&
             <IconButton
+              name={icons.DOWNLOAD}
+              title={translate('Download')}
+              to={`${window.Readarr.apiRoot}/bookfile/${id}/download?apikey=${encodeURIComponent(window.Readarr.apiKey)}`}
+              noRouter={true}
+            />
+        }
+        {
+          path &&
+            <IconButton
               name={icons.DELETE}
               onPress={this.onDeleteFilePress}
             />

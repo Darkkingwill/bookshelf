@@ -7,6 +7,7 @@ import { kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import BookEditorFooterLabel from './BookEditorFooterLabel';
 import DeleteBookModal from './Delete/DeleteBookModal';
+import MergeBookModal from './Merge/MergeBookModal';
 import styles from './BookEditorFooter.css';
 
 const NO_CHANGE = 'noChange';
@@ -24,6 +25,7 @@ class BookEditorFooter extends Component {
       rootFolderPath: NO_CHANGE,
       savingTags: false,
       isDeleteBookModalOpen: false,
+      isMergeBookModalOpen: false,
       isTagsModalOpen: false,
       isConfirmMoveModalOpen: false,
       destinationRootFolder: null
@@ -72,6 +74,14 @@ class BookEditorFooter extends Component {
     this.setState({ isDeleteBookModalOpen: false });
   };
 
+  onMergeSelectedPress = () => {
+    this.setState({ isMergeBookModalOpen: true });
+  };
+
+  onMergeBookModalClose = () => {
+    this.setState({ isMergeBookModalOpen: false });
+  };
+
   //
   // Render
 
@@ -85,7 +95,8 @@ class BookEditorFooter extends Component {
 
     const {
       monitored,
-      isDeleteBookModalOpen
+      isDeleteBookModalOpen,
+      isMergeBookModalOpen
     } = this.state;
 
     const monitoredOptions = [
@@ -120,6 +131,16 @@ class BookEditorFooter extends Component {
 
             <div className={styles.buttons}>
               <SpinnerButton
+                className={styles.mergeSelectedButton}
+                kind={kinds.WARNING}
+                isDisabled={selectedCount < 2}
+                title={selectedCount < 2 ? 'Select 2 or more duplicate books to merge' : undefined}
+                onPress={this.onMergeSelectedPress}
+              >
+                Merge
+              </SpinnerButton>
+
+              <SpinnerButton
                 className={styles.deleteSelectedButton}
                 kind={kinds.DANGER}
                 isSpinning={isDeleting}
@@ -136,6 +157,12 @@ class BookEditorFooter extends Component {
           isOpen={isDeleteBookModalOpen}
           bookIds={bookIds}
           onModalClose={this.onDeleteBookModalClose}
+        />
+
+        <MergeBookModal
+          isOpen={isMergeBookModalOpen}
+          bookIds={bookIds}
+          onModalClose={this.onMergeBookModalClose}
         />
 
       </PageContentFooter>

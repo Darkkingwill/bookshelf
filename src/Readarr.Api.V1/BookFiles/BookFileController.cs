@@ -108,6 +108,24 @@ namespace Readarr.Api.V1.BookFiles
             }
         }
 
+        [HttpGet("{id:int}/download")]
+        public IActionResult DownloadBookFile(int id)
+        {
+            var bookFile = _mediaFileService.Get(id);
+
+            if (bookFile == null)
+            {
+                throw new NzbDroneClientException(HttpStatusCode.NotFound, "Book file not found");
+            }
+
+            if (!global::System.IO.File.Exists(bookFile.Path))
+            {
+                throw new NzbDroneClientException(HttpStatusCode.NotFound, "File does not exist on disk");
+            }
+
+            return PhysicalFile(bookFile.Path, "application/octet-stream", Path.GetFileName(bookFile.Path));
+        }
+
         [RestPutById]
         public ActionResult<BookFileResource> SetQuality(BookFileResource bookFileResource)
         {

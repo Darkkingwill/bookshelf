@@ -301,6 +301,7 @@
   "DoNotBlocklistHint": "Remove without blocklisting",
   "Docker": "Docker",
   "DockerUpdater": "Update the docker container to receive the update",
+  "Download": "Download",
   "DownloadClient": "Download Client",
   "DownloadClientCheckDownloadingToRoot": "Download client {0} places downloads in the root folder {1}. You should not download to a root folder.",
   "DownloadClientCheckNoneAvailableMessage": "No download client is available",
