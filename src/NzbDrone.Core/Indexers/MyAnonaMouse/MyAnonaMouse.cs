@@ -268,16 +268,23 @@ namespace NzbDrone.Core.Indexers.MyAnonaMouse
 
                 release.Title = item.Title;
 
-                if (item.AuthorInfo != null)
+                var author = ParseNamePairs(item.AuthorInfo).Take(5).Join(", ");
+                if (author.IsNotNullOrWhiteSpace())
                 {
-                    var authorInfo = JsonConvert.DeserializeObject<Dictionary<string, string>>(item.AuthorInfo);
-                    var author = authorInfo?.Take(5).Select(v => v.Value).Join(", ");
+                    release.Title += " by " + author;
+                    release.Author = author;
+                }
 
-                    if (author.IsNotNullOrWhiteSpace())
-                    {
-                        release.Title += " by " + author;
-                        release.Author = author;
-                    }
+                var narrator = ParseNamePairs(item.NarratorInfo).Take(5).Join(", ");
+                if (narrator.IsNotNullOrWhiteSpace())
+                {
+                    release.Title += ", narrated by " + narrator;
+                }
+
+                var series = ParseSeriesInfo(item.SeriesInfo);
+                if (series.IsNotNullOrWhiteSpace())
+                {
+                    release.Title += " (" + series + ")";
                 }
 
                 var flags = new List<string>();
@@ -323,6 +330,56 @@ namespace NzbDrone.Core.Indexers.MyAnonaMouse
             CookiesUpdater?.Invoke(httpResponse.GetCookies(), DateTime.Now.AddDays(30));
 
             return releaseInfos.ToArray();
+        }
+
+        // author_info and narrator_info are both a JSON object encoded as a string,
+        // mapping ids to names. Malformed data degrades to no names rather than
+        // failing the whole search - MAM has occasionally shipped a bad value here.
+        private static List<string> ParseNamePairs(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new List<string>();
+            }
+
+            try
+            {
+                var dict = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+                return dict?.Values.Where(v => v.IsNotNullOrWhiteSpace()).ToList() ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
+
+        // series_info differs from the name pairs: its values are lists of
+        // [name, placement], e.g. {"67": ["Love at Stake", "01-16"]}.
+        private static string ParseSeriesInfo(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+
+            try
+            {
+                var dict = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(json);
+                var first = dict?.Values.FirstOrDefault();
+
+                if (first == null || first.Count == 0 || first[0].IsNullOrWhiteSpace())
+                {
+                    return null;
+                }
+
+                var placement = first.Count > 1 ? first[1] : null;
+
+                return placement.IsNotNullOrWhiteSpace() ? $"{first[0]} #{placement}" : first[0];
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private string GetDownloadUrl(int torrentId, bool canUseToken)
@@ -600,6 +657,10 @@ namespace NzbDrone.Core.Indexers.MyAnonaMouse
         public string Title { get; set; }
         [JsonProperty(PropertyName = "author_info")]
         public string AuthorInfo { get; set; }
+        [JsonProperty(PropertyName = "narrator_info")]
+        public string NarratorInfo { get; set; }
+        [JsonProperty(PropertyName = "series_info")]
+        public string SeriesInfo { get; set; }
         [JsonProperty(PropertyName = "lang_code")]
         public string LanguageCode { get; set; }
         public string Filetype { get; set; }
