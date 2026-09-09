@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -83,6 +84,20 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
 
             var coverPath = FindCoverPath(book, edition);
 
+            var destinationPath = BuildDestinationPath(author, edition);
+            var destinationFolder = Path.GetDirectoryName(destinationPath);
+            if (destinationFolder.IsNotNullOrWhiteSpace())
+            {
+                _diskProvider.CreateFolder(destinationFolder);
+            }
+
+            // Check every folder we'll need to write to or delete from up front, before
+            // spending 15-20 minutes on the ffmpeg encode. A folder with mismatched
+            // ownership/permissions (seen in practice: a folder owned by a different
+            // user than the app runs as) fails silently until the delete step, by which
+            // point the encode work is wasted and the book is left in a mixed state.
+            EnsureFoldersWritable(orderedFiles, destinationFolder);
+
             var tempOutputPath = Path.Combine(Path.GetTempPath(), $"m4b-convert-{Guid.NewGuid()}.m4b");
 
             try
@@ -99,14 +114,6 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
                 if (!_diskProvider.FileExists(tempOutputPath) || _diskProvider.GetFileSize(tempOutputPath) == 0)
                 {
                     throw new InvalidOperationException("ffmpeg did not produce a usable output file");
-                }
-
-                var destinationPath = BuildDestinationPath(author, edition);
-
-                var destinationFolder = Path.GetDirectoryName(destinationPath);
-                if (destinationFolder.IsNotNullOrWhiteSpace())
-                {
-                    _diskProvider.CreateFolder(destinationFolder);
                 }
 
                 _diskProvider.MoveFile(tempOutputPath, destinationPath, true);
@@ -140,6 +147,28 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
                 if (_diskProvider.FileExists(tempOutputPath))
                 {
                     _diskProvider.DeleteFile(tempOutputPath);
+                }
+            }
+        }
+
+        private void EnsureFoldersWritable(List<BookFile> orderedFiles, string destinationFolder)
+        {
+            var foldersToCheck = orderedFiles
+                .Select(f => Path.GetDirectoryName(f.Path))
+                .Where(d => d.IsNotNullOrWhiteSpace())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (destinationFolder.IsNotNullOrWhiteSpace() && !foldersToCheck.Contains(destinationFolder, StringComparer.OrdinalIgnoreCase))
+            {
+                foldersToCheck.Add(destinationFolder);
+            }
+
+            foreach (var folder in foldersToCheck)
+            {
+                if (!_diskProvider.FolderWritable(folder))
+                {
+                    throw new InvalidOperationException($"'{folder}' is not writable by the app - fix its permissions/ownership before converting. No files were changed.");
                 }
             }
         }
