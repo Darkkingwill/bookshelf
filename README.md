@@ -44,6 +44,38 @@ override the series title, position, or which linked series is treated as
 primary from that book's Edit modal, without waiting on the provider to fix
 its data.
 
+### Convert to M4B
+
+A book's toolbar has a **Convert to M4B** button (next to Preview Rename /
+Preview Retag) that merges every file currently on disk for that book into a
+single chaptered `.m4b`, with cover art embedded and chapter titles taken
+from the original filenames. ffmpeg is already bundled in the Docker image,
+no extra setup needed.
+
+- If the audiobook came as multiple parts, import the download normally
+  first so all the part-files show up under the book, then run the
+  conversion - it merges whatever files are currently attached to the book,
+  in track order.
+- This is destructive: once the merge succeeds, the original files are
+  deleted and replaced by the new `.m4b`. You'll get a confirmation prompt
+  first.
+- If your download client hardlinks into the library (the default for most
+  setups), deleting the original files here only removes bookshelf's link to
+  them - the copy your download client is still seeding is a separate,
+  independent hardlink and is untouched. It's safe to convert a book while
+  its download is still seeding.
+- Before doing the (potentially long) encode, bookshelf checks that it can
+  actually write to every folder involved and fails immediately with no
+  changes made if it can't, rather than finishing a long encode and then
+  failing partway through cleanup.
+
+### MyAnonaMouse narrator & series
+
+The built-in MyAnonaMouse indexer includes narrator and series information
+(when MAM provides it) directly in release titles, so you can tell them
+apart in the interactive search results without needing to open each
+release on MAM's site.
+
 ## Support
 
 This project won't use Discord for support. If you have a problem please file
@@ -58,12 +90,17 @@ Help is very welcome. Priority is on fixing quality of life issues
 
 Already done
 
-- [x] Native support for MyAnonaMouse without Prowlarr.
+- [x] Native support for MyAnonaMouse without Prowlarr, including narrator
+      and series info in release titles.
+- [x] Convert multi-file audiobooks to a single chaptered M4B, with cover
+      art, from the book page.
 - [x] Hardcover list import.
 - [x] Improved matching.
 - [x] Metadata is no longer cached locally.
 - [x] Removed servarr analytics spyware.
 - [x] Supports selfhosted metadata (UI or `METADATA_URL` env var).
+- [x] Goodreads requests are rate-limited with automatic backoff, and a
+      health check flags it if the API key stops working.
 
 ## Sponsors
 
