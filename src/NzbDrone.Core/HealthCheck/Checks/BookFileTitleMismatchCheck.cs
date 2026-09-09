@@ -6,20 +6,27 @@ using NzbDrone.Core.Books;
 using NzbDrone.Core.Localization;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.Events;
-using NzbDrone.Core.Parser;
 
 namespace NzbDrone.Core.HealthCheck.Checks
 {
     // Catches a file that's been imported onto the wrong book by the same author - e.g. a
     // "Manual Import" batch where several rows were left checked and the bulk "Select Book"
-    // action stamped one book onto all of them. Only flags a file when another book by the
-    // same author is a clearly better textual match than the one it's currently attached to,
-    // so generic/numbered filenames (which won't match anything) don't create noise.
+    // action stamped one book onto all of them. Scores the filename against every book title
+    // by the same author (word-overlap + Levenshtein, same FuzzyMatch used elsewhere for
+    // author/book identification) and only flags a file when some other book scores clearly
+    // higher than the one it's currently attached to. An earlier plain-substring version of
+    // this check flagged ~10x as many files as this one does on a real library - subtitles
+    // ("Plain Truth" vs "Plain Truth: A Novel"), omnibus/series-collection titles, and shared
+    // recurring words (a character name repeated across several book titles) all produced
+    // false hits under substring matching but score correctly under fuzzy matching.
     [CheckOn(typeof(TrackImportedEvent))]
     [CheckOn(typeof(BookImportedEvent))]
     public class BookFileTitleMismatchCheck : HealthCheckBase
     {
-        private const int MinCleanTitleLength = 6;
+        private const int MinNormalizedTitleLength = 4;
+        private const double MaxAttachedScoreToFlag = 0.5;
+        private const double MinBetterMatchScore = 0.75;
+        private const double MinScoreMargin = 0.25;
 
         private readonly IAuthorService _authorService;
         private readonly IBookService _bookService;
@@ -50,13 +57,17 @@ namespace NzbDrone.Core.HealthCheck.Checks
                     continue;
                 }
 
-                var booksById = books.ToDictionary(b => b.Id);
-                var candidateBooks = books.Where(b => b.CleanTitle.IsNotNullOrWhiteSpace() && b.CleanTitle.Length >= MinCleanTitleLength).ToList();
+                var candidates = books
+                    .Select(b => (Book: b, Normalized: Parser.Parser.NormalizeTitle(b.Title)))
+                    .Where(c => c.Normalized.Length >= MinNormalizedTitleLength)
+                    .ToList();
 
-                if (!candidateBooks.Any())
+                if (!candidates.Any())
                 {
                     continue;
                 }
+
+                var booksById = books.ToDictionary(b => b.Id);
 
                 foreach (var file in _mediaFileService.GetFilesByAuthor(author.Id))
                 {
@@ -67,26 +78,23 @@ namespace NzbDrone.Core.HealthCheck.Checks
                         continue;
                     }
 
-                    var cleanFileName = file.GetSceneOrFileName().CleanAuthorName();
+                    var fileNormalized = Parser.Parser.NormalizeTitle(file.GetSceneOrFileName());
 
-                    if (cleanFileName.IsNullOrWhiteSpace())
+                    if (fileNormalized.Length < MinNormalizedTitleLength)
                     {
                         continue;
                     }
 
-                    // If the currently-attached book's own title is already a reasonable match,
-                    // leave it alone even if another title happens to also appear in the name
-                    // (e.g. omnibus/boxset filenames that legitimately mention several titles).
-                    if (attachedBook.CleanTitle.IsNotNullOrWhiteSpace() && cleanFileName.Contains(attachedBook.CleanTitle))
-                    {
-                        continue;
-                    }
+                    var scored = candidates.Select(c => (c.Book, Score: fileNormalized.FuzzyMatch(c.Normalized))).ToList();
+                    var attachedScore = scored.FirstOrDefault(s => s.Book.Id == attachedBook.Id).Score;
+                    var best = scored.Where(s => s.Book.Id != attachedBook.Id).OrderByDescending(s => s.Score).FirstOrDefault();
 
-                    var betterMatch = candidateBooks.FirstOrDefault(b => b.Id != attachedBook.Id && cleanFileName.Contains(b.CleanTitle));
-
-                    if (betterMatch != null)
+                    if (best.Book != null &&
+                        attachedScore < MaxAttachedScoreToFlag &&
+                        best.Score >= MinBetterMatchScore &&
+                        best.Score - attachedScore >= MinScoreMargin)
                     {
-                        mismatches.Add($"{author.Name}: \"{Path.GetFileName(file.Path)}\" is filed under \"{attachedBook.Title}\" but looks like \"{betterMatch.Title}\"");
+                        mismatches.Add($"{author.Name}: \"{Path.GetFileName(file.Path)}\" is filed under \"{attachedBook.Title}\" but looks like \"{best.Book.Title}\"");
                     }
                 }
             }
