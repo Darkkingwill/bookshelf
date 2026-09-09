@@ -11,11 +11,13 @@ on:
     paths-ignore:
       - ".github/**"
       - "src/Readarr.Api.*/openapi.json"
+      - "**/*.md"
   pull_request:
     paths-ignore:
       - ".github/**"
       - "src/NzbDrone.Core/Localization/Core"
       - "src/Readarr.Api.*/openapi.json"
+      - "**/*.md"
 
 env:
   DOTNET_VERSION: "6.0.427"
