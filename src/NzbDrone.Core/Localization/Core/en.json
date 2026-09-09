@@ -106,6 +106,7 @@
   "BookAvailableButMissing": "Book Available, but Missing",
   "BookEditor": "Book Editor",
   "BookFilesCountMessage": "No book files",
+  "BookFileTitleMismatchHealthCheckMessage": "One or more files may be filed under the wrong book: {0}",
   "BookIndex": "Book Index",
   "BookIsDownloading": "Book is downloading",
   "BookIsDownloadingInterp": "Book is downloading - {0}% {1}",
