@@ -4,8 +4,7 @@ import { createThunk, handleThunks } from 'Store/thunks';
 import { isSameCommand } from 'Utilities/Command';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import { hideMessage, showMessage } from './appActions';
-import { removeItem, updateItem } from './baseActions';
-import createFetchHandler from './Creators/createFetchHandler';
+import { removeItem, set, update, updateItem } from './baseActions';
 import createHandleActions from './Creators/createHandleActions';
 import createRemoveItemHandler from './Creators/createRemoveItemHandler';
 
@@ -162,7 +161,46 @@ export function executeCommandHelper(payload, dispatch) {
 // Action Handlers
 
 export const actionHandlers = handleThunks({
-  [FETCH_COMMANDS]: createFetchHandler('commands', '/command'),
+  [FETCH_COMMANDS]: function(getState, payload, dispatch) {
+    dispatch(set({ section, isFetching: true }));
+
+    const { request } = createAjaxRequest({
+      url: '/command',
+      data: payload,
+      traditional: true
+    });
+
+    request.done((data) => {
+      dispatch(batchActions([
+        update({ section, data }),
+
+        set({
+          section,
+          isFetching: false,
+          isPopulated: true,
+          error: null
+        })
+      ]));
+
+      // A command that was already running when this fetch happens (page
+      // load, or a reconnect after being disconnected) never had the chance
+      // to fire the live update that normally triggers showCommandMessage -
+      // without this, a still-running command shows nothing in the sidebar
+      // until it happens to finish while the tab is open and connected.
+      data
+        .filter((command) => command.status === 'started')
+        .forEach((command) => showCommandMessage(command, dispatch));
+    });
+
+    request.fail((xhr) => {
+      dispatch(set({
+        section,
+        isFetching: false,
+        isPopulated: false,
+        error: xhr.aborted ? null : xhr
+      }));
+    });
+  },
 
   [EXECUTE_COMMAND]: function(getState, payload, dispatch) {
     executeCommandHelper(payload, dispatch);

@@ -316,6 +316,12 @@ class SignalRConnector extends Component {
       isDisconnected: false,
       isRestarting: false
     });
+
+    // Only onReconnected fetched commands before, so a plain page load/refresh
+    // (the first connection, not a reconnect) never learned about a command
+    // already running - a long task like an M4B conversion would show nothing
+    // in the sidebar unless the tab happened to be open when it started.
+    this.props.dispatchFetchCommands();
   };
 
   onReconnecting = () => {
