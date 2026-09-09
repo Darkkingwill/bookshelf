@@ -79,6 +79,11 @@ function createMapStateToProps() {
         isCommandExecuting(isSearchingCommand) &&
         isSearchingCommand.body.bookIds.indexOf(book.id) > -1
       );
+      const isConvertingToM4bCommand = findCommand(commands, { name: commandNames.CONVERT_TO_M4B });
+      const isConvertingToM4b = (
+        isCommandExecuting(isConvertingToM4bCommand) &&
+        isConvertingToM4bCommand.body.bookId === book.id
+      );
       const isRenamingFiles = isCommandExecuting(findCommand(commands, { name: commandNames.RENAME_FILES, authorId: author.id }));
       const isRenamingAuthorCommand = findCommand(commands, { name: commandNames.RENAME_AUTHOR });
       const isRenamingAuthor = (
@@ -95,6 +100,7 @@ function createMapStateToProps() {
         author,
         isRefreshing,
         isSearching,
+        isConvertingToM4b,
         isRenamingFiles,
         isRenamingAuthor,
         isFetching,
@@ -204,6 +210,13 @@ class BookDetailsConnector extends Component {
     });
   };
 
+  onConvertToM4bPress = () => {
+    this.props.executeCommand({
+      name: commandNames.CONVERT_TO_M4B,
+      bookId: this.props.id
+    });
+  };
+
   //
   // Render
 
@@ -213,6 +226,7 @@ class BookDetailsConnector extends Component {
         {...this.props}
         onMonitorTogglePress={this.onMonitorTogglePress}
         onRefreshPress={this.onRefreshPress}
+        onConvertToM4bPress={this.onConvertToM4bPress}
         onSearchPress={this.onSearchPress}
       />
     );

@@ -7,6 +7,7 @@ import EditBookModalConnector from 'Book/Edit/EditBookModalConnector';
 import BookFileEditorTable from 'BookFile/Editor/BookFileEditorTable';
 import IconButton from 'Components/Link/IconButton';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
+import ConfirmModal from 'Components/Modal/ConfirmModal';
 import PageContent from 'Components/Page/PageContent';
 import PageContentBody from 'Components/Page/PageContentBody';
 import PageToolbar from 'Components/Page/Toolbar/PageToolbar';
@@ -14,7 +15,7 @@ import PageToolbarButton from 'Components/Page/Toolbar/PageToolbarButton';
 import PageToolbarSection from 'Components/Page/Toolbar/PageToolbarSection';
 import PageToolbarSeparator from 'Components/Page/Toolbar/PageToolbarSeparator';
 import SwipeHeaderConnector from 'Components/Swipe/SwipeHeaderConnector';
-import { icons } from 'Helpers/Props';
+import { icons, kinds } from 'Helpers/Props';
 import InteractiveSearchFilterMenuConnector from 'InteractiveSearch/InteractiveSearchFilterMenuConnector';
 import InteractiveSearchTable from 'InteractiveSearch/InteractiveSearchTable';
 import OrganizePreviewModalConnector from 'Organize/OrganizePreviewModalConnector';
@@ -36,6 +37,7 @@ class BookDetails extends Component {
       isRetagModalOpen: false,
       isEditBookModalOpen: false,
       isDeleteBookModalOpen: false,
+      isConvertToM4bModalOpen: false,
       selectedTabIndex: 0
     };
   }
@@ -78,6 +80,19 @@ class BookDetails extends Component {
     this.setState({ isDeleteBookModalOpen: false });
   };
 
+  onConvertToM4bPress = () => {
+    this.setState({ isConvertToM4bModalOpen: true });
+  };
+
+  onConvertToM4bModalClose = () => {
+    this.setState({ isConvertToM4bModalOpen: false });
+  };
+
+  onConvertToM4bConfirm = () => {
+    this.setState({ isConvertToM4bModalOpen: false });
+    this.props.onConvertToM4bPress();
+  };
+
   onTabSelect = (index, lastIndex) => {
     this.setState({ selectedTabIndex: index });
   };
@@ -98,6 +113,7 @@ class BookDetails extends Component {
       previousBook,
       nextBook,
       isSearching,
+      isConvertingToM4b,
       onRefreshPress,
       onSearchPress,
       statistics = {}
@@ -112,6 +128,7 @@ class BookDetails extends Component {
       isRetagModalOpen,
       isEditBookModalOpen,
       isDeleteBookModalOpen,
+      isConvertToM4bModalOpen,
       selectedTabIndex
     } = this.state;
 
@@ -149,6 +166,16 @@ class BookDetails extends Component {
               iconName={icons.RETAG}
               isDisabled={!hasBookFiles}
               onPress={this.onRetagPress}
+            />
+
+            <PageToolbarButton
+              label={translate('ConvertToM4b')}
+              iconName={icons.TRACK_FILE}
+              spinningName={icons.TRACK_FILE}
+              title={translate('ConvertToM4bHelpText')}
+              isSpinning={isConvertingToM4b}
+              isDisabled={!hasBookFiles}
+              onPress={this.onConvertToM4bPress}
             />
 
             <PageToolbarSeparator />
@@ -323,6 +350,16 @@ class BookDetails extends Component {
             onModalClose={this.onDeleteBookModalClose}
           />
 
+          <ConfirmModal
+            isOpen={isConvertToM4bModalOpen}
+            kind={kinds.DANGER}
+            title={translate('ConvertToM4b')}
+            message={translate('ConvertToM4bHelpText')}
+            confirmLabel={translate('ConvertToM4b')}
+            onConfirm={this.onConvertToM4bConfirm}
+            onCancel={this.onConvertToM4bModalClose}
+          />
+
         </PageContentBody>
       </PageContent>
     );
@@ -346,6 +383,7 @@ BookDetails.propTypes = {
   isSaving: PropTypes.bool.isRequired,
   isRefreshing: PropTypes.bool,
   isSearching: PropTypes.bool,
+  isConvertingToM4b: PropTypes.bool,
   isFetching: PropTypes.bool,
   isPopulated: PropTypes.bool,
   bookFilesError: PropTypes.object,
@@ -356,7 +394,8 @@ BookDetails.propTypes = {
   isSmallScreen: PropTypes.bool.isRequired,
   onMonitorTogglePress: PropTypes.func.isRequired,
   onRefreshPress: PropTypes.func,
-  onSearchPress: PropTypes.func.isRequired
+  onSearchPress: PropTypes.func.isRequired,
+  onConvertToM4bPress: PropTypes.func.isRequired
 };
 
 BookDetails.defaultProps = {

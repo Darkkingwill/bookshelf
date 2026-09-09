@@ -9,7 +9,8 @@ ENV XDG_CONFIG_HOME="/config/xdg" \
 RUN apk add -U --upgrade --no-cache \
     icu-libs \
     sqlite-libs \
-    xmlstarlet
+    xmlstarlet \
+    ffmpeg
 
 ARG GIT_BRANCH
 ARG COMMIT_HASH

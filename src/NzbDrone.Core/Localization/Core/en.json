@@ -186,6 +186,8 @@
   "ConnectionSettingsUrlBaseHelpText": "Adds a prefix to the {connectionName} url, such as {url}",
   "Connections": "Connections",
   "ConsoleLogLevel": "Console Log Level",
+  "ConvertToM4b": "Convert to M4B",
+  "ConvertToM4bHelpText": "Merge this book's current file(s) into a single chaptered M4B. Replaces the existing file(s) - this cannot be undone.",
   "Continuing": "Continuing",
   "ContinuingAllBooksDownloaded": "Continuing (All books downloaded)",
   "ContinuingMoreBooksAreExpected": "More books are expected",
