@@ -284,6 +284,40 @@ namespace NzbDrone.Core.Books
         protected override Tuple<Edition, List<Edition>> GetMatchingExistingChildren(List<Edition> existingChildren, Edition remote)
         {
             var existingChild = existingChildren.SingleOrDefault(x => x.ForeignEditionId == remote.ForeignEditionId);
+
+            // Unlike books/authors (see RefreshBookService.GetRemoteData / RefreshAuthorService's
+            // own matching), an edition has no title to fall back on when its id changes out from
+            // under it after a Metadata Source switch - most editions of a book share the book's
+            // own title, so there's nothing distinctive to match by. What IS reliable: a BookFile
+            // is linked only by EditionId (see BookFile.cs - there's no BookId), so if the edition
+            // backing it gets deleted here rather than re-matched, the file is left with a
+            // dangling id that GetFilesByBook can no longer resolve through - and since
+            // RefreshBookService.ShouldDelete checks exactly that join, the book itself then looks
+            // fileless and becomes eligible for deletion too, on the very next refresh.
+            //
+            // Only handle the single-local-edition case: with exactly one local edition, whichever
+            // remote edition needs a match is unambiguously it, so re-target it in place instead
+            // of deleting it and inserting the remote one file-less. With more than one local
+            // edition there's no reliable way to know which should absorb which remote edition, so
+            // leave those to the existing add/delete behavior rather than risk re-targeting the
+            // wrong file onto the wrong edition. Require it to actually matter too (monitored, or
+            // carrying a file) - an unmonitored, fileless extra edition re-targeting itself isn't
+            // worth the risk for no benefit.
+            if (existingChild == null && existingChildren.Count == 1)
+            {
+                var candidate = existingChildren[0];
+
+                if (candidate.Monitored || _mediaFileService.GetFilesByEdition(candidate.Id).Any())
+                {
+                    existingChild = candidate;
+
+                    // Claim it now so a book with more than one remote edition can't also match
+                    // this same local edition again on a later iteration of this loop (existingChildren
+                    // is the same list instance across every call for this book's SortChildren pass).
+                    existingChildren.Remove(candidate);
+                }
+            }
+
             return Tuple.Create(existingChild, new List<Edition>());
         }
 
@@ -297,6 +331,17 @@ namespace NzbDrone.Core.Books
         {
             local.BookId = entity.Id;
             local.Book = entity;
+
+            // Normally already true - that's how the plain id match in GetMatchingExistingChildren
+            // found `local` in the first place. But its fallback for a Metadata-Source-switched
+            // book matches by which edition holds a file/is monitored, not by id, so `local` can
+            // still carry its old, stale ForeignEditionId here. RefreshEditionService.RefreshEditionInfo
+            // re-derives the local/remote pairing for its "update" list by looking up
+            // remoteEditions.Single(e => e.ForeignEditionId == edition.ForeignEditionId) against
+            // the LOCAL edition's id before applying UseMetadataFrom - so if this weren't synced
+            // now, that lookup would find nothing (the old id, by construction, matches no remote
+            // edition) and throw.
+            local.ForeignEditionId = remote.ForeignEditionId;
 
             remote.UseDbFieldsFrom(local);
         }
