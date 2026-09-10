@@ -10,6 +10,8 @@ using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.History;
 using NzbDrone.Core.ImportLists.Exclusions;
 using NzbDrone.Core.MediaFiles;
+using NzbDrone.Core.MediaFiles.Commands;
+using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Profiles.Metadata;
 using NzbDrone.Core.RootFolders;
@@ -321,6 +323,67 @@ namespace NzbDrone.Core.Test.MusicTests
                 .Verify(v => v.UpdateMany(It.Is<List<Book>>(x => x.Count == _books.Count)));
 
             ExceptionVerification.ExpectedWarns(1);
+        }
+
+        [Test]
+        public void rescan_scopes_to_author_path_not_root_folder()
+        {
+            var newAuthorInfo = _author.JsonClone();
+            newAuthorInfo.Metadata = _author.Metadata.Value.JsonClone();
+            newAuthorInfo.Books = _remoteBooks;
+
+            GivenNewAuthorInfo(newAuthorInfo);
+            GivenBooksForRefresh(_books);
+            AllowAuthorUpdate();
+
+            Subject.Execute(new RefreshAuthorCommand(_author.Id, isNewAuthor: true));
+
+            Mocker.GetMock<IManageCommandQueue>()
+                .Verify(
+                    q => q.Push(
+                        It.Is<RescanFoldersCommand>(c =>
+                            c.Folders.Count == 1 &&
+                            c.Folders[0] == _author.Path),
+                        It.IsAny<CommandPriority>(),
+                        It.IsAny<CommandTrigger>()),
+                    Times.Once);
+
+            Mocker.GetMock<IManageCommandQueue>()
+                .Verify(
+                    q => q.Push(
+                        It.Is<RescanFoldersCommand>(c => c.Folders.Count > 1),
+                        It.IsAny<CommandPriority>(),
+                        It.IsAny<CommandTrigger>()),
+                    Times.Never);
+        }
+
+        [Test]
+        public void rescan_falls_back_to_root_folder_when_author_has_no_path()
+        {
+            // Author with no path yet - e.g. mid-add, before its folder is assigned
+            _author.Path = string.Empty;
+
+            Mocker.GetMock<IRootFolderService>()
+                .Setup(x => x.All())
+                .Returns(new List<RootFolder> { new RootFolder { Path = "/books" } });
+
+            var newAuthorInfo = _author.JsonClone();
+            newAuthorInfo.Metadata = _author.Metadata.Value.JsonClone();
+            newAuthorInfo.Books = _remoteBooks;
+
+            GivenNewAuthorInfo(newAuthorInfo);
+            GivenBooksForRefresh(_books);
+            AllowAuthorUpdate();
+
+            Subject.Execute(new RefreshAuthorCommand(_author.Id, isNewAuthor: true));
+
+            Mocker.GetMock<IManageCommandQueue>()
+                .Verify(
+                    q => q.Push(
+                        It.Is<RescanFoldersCommand>(c => c.Folders.Contains("/books")),
+                        It.IsAny<CommandPriority>(),
+                        It.IsAny<CommandTrigger>()),
+                    Times.Once);
         }
     }
 }
