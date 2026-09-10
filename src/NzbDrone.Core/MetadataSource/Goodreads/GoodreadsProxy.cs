@@ -248,7 +248,15 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             httpRequest.AllowAutoRedirect = true;
             httpRequest.SuppressHttpError = true;
 
-            var httpResponse = Execute(httpRequest, false, TimeSpan.FromDays(90));
+            // useCache was false here despite the 90-day TTL, so every book refresh - including a
+            // book re-processed shortly after its first successful fetch, e.g. retrying a batch
+            // during a bulk author migration - paid for a fresh live call against the shared key
+            // for data that essentially never changes once a book is identified (unlike authors,
+            // who need to stay fresh to surface new releases - see GetAuthorInfo, deliberately
+            // left alone). CachedHttpResponseService.Get already writes every successful response
+            // regardless of this flag, so the cache was being filled the whole time and simply
+            // never read back from.
+            var httpResponse = Execute(httpRequest, true, TimeSpan.FromDays(90));
 
             if (httpResponse.HasHttpError)
             {
