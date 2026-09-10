@@ -24,6 +24,16 @@
   font-size: 18px;
 }
 
+.searchSourceInput {
+  composes: select from '~Components/Form/SelectInput.css';
+
+  flex: 0 0 auto;
+  width: 180px;
+  height: 46px;
+  border-left: none;
+  border-radius: 0;
+}
+
 .clearLookupButton {
   border: 1px solid var(--inputBorderColor);
   border-left: none;

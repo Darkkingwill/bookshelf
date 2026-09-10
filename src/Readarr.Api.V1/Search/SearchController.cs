@@ -26,9 +26,9 @@ namespace Readarr.Api.V1.Search
         }
 
         [HttpGet]
-        public object Search([FromQuery] string term)
+        public object Search([FromQuery] string term, [FromQuery] string source = null)
         {
-            var searchResults = _searchProxy.SearchForNewEntity(term);
+            var searchResults = _searchProxy.SearchForNewEntity(term, source);
             return MapToResource(searchResults).ToList();
         }
 

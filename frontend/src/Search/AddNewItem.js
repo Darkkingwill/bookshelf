@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import Alert from 'Components/Alert';
+import SelectInput from 'Components/Form/SelectInput';
 import TextInput from 'Components/Form/TextInput';
 import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
@@ -15,6 +16,16 @@ import AddNewAuthorSearchResultConnector from './Author/AddNewAuthorSearchResult
 import AddNewBookSearchResultConnector from './Book/AddNewBookSearchResultConnector';
 import styles from './AddNewItem.css';
 
+// "Default" leaves the choice to whatever's globally configured (bookinfo.pro, normally) - its
+// title search occasionally maps a name to the wrong id (see the fork's Goodreads-pinning work).
+// "Goodreads (direct)" instead resolves the term as an author name straight against Goodreads
+// and lists everything of theirs, sidestepping that proxy entirely - the same trusted path an
+// author already pinned to Goodreads uses for refreshes.
+const searchSourceOptions = [
+  { key: '', value: 'Default' },
+  { key: 'goodreads', value: 'Goodreads (direct)' }
+];
+
 class AddNewItem extends Component {
 
   //
@@ -25,6 +36,7 @@ class AddNewItem extends Component {
 
     this.state = {
       term: props.term || '',
+      source: '',
       isFetching: false
     };
   }
@@ -33,7 +45,7 @@ class AddNewItem extends Component {
     const term = this.state.term;
 
     if (term) {
-      this.props.onSearchChange(term);
+      this.props.onSearchChange(term, this.state.source);
     }
   }
 
@@ -48,7 +60,7 @@ class AddNewItem extends Component {
         term,
         isFetching: true
       });
-      this.props.onSearchChange(term);
+      this.props.onSearchChange(term, this.state.source);
     } else if (isFetching !== prevProps.isFetching) {
       this.setState({
         isFetching
@@ -64,9 +76,18 @@ class AddNewItem extends Component {
 
     this.setState({ term: value, isFetching: hasValue }, () => {
       if (hasValue) {
-        this.props.onSearchChange(value);
+        this.props.onSearchChange(value, this.state.source);
       } else {
         this.props.onClearSearch();
+      }
+    });
+  };
+
+  onSearchSourceChange = ({ value }) => {
+    this.setState({ source: value }, () => {
+      if (this.state.term.trim()) {
+        this.setState({ isFetching: true });
+        this.props.onSearchChange(this.state.term, value);
       }
     });
   };
@@ -87,6 +108,7 @@ class AddNewItem extends Component {
     } = this.props;
 
     const term = this.state.term;
+    const source = this.state.source;
     const isFetching = this.state.isFetching;
 
     return (
@@ -107,6 +129,14 @@ class AddNewItem extends Component {
               placeholder={translate('SearchBoxPlaceHolder')}
               autoFocus={true}
               onChange={this.onSearchInputChange}
+            />
+
+            <SelectInput
+              className={styles.searchSourceInput}
+              name="searchSource"
+              value={source}
+              values={searchSourceOptions}
+              onChange={this.onSearchSourceChange}
             />
 
             <Button

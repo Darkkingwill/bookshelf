@@ -56,7 +56,7 @@ class AddNewItemConnector extends Component {
   //
   // Listeners
 
-  onSearchChange = (term) => {
+  onSearchChange = (term, source) => {
     if (this._searchTimeout) {
       clearTimeout(this._searchTimeout);
     }
@@ -65,7 +65,7 @@ class AddNewItemConnector extends Component {
       this.props.clearSearchResults();
     } else {
       this._searchTimeout = setTimeout(() => {
-        this.props.getSearchResults({ term });
+        this.props.getSearchResults({ term, source });
       }, 300);
     }
   };

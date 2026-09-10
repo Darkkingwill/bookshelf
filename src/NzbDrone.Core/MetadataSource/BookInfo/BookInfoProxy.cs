@@ -406,8 +406,18 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             };
         }
 
-        public List<object> SearchForNewEntity(string title)
+        public List<object> SearchForNewEntity(string title, string source = null)
         {
+            // Only "goodreads" gets its own path - same reasoning as GetAuthorInfo/GetBookInfo's
+            // source routing: it's the one source with an independently-verified id space and a
+            // working direct client, so it's worth bypassing bookinfo.pro's own (occasionally
+            // wrong) title-to-id mapping for. Anything else (null, "hardcover", or an unrecognized
+            // value) keeps the existing default behavior unchanged.
+            if (source.IsNotNullOrWhiteSpace() && source.Equals("goodreads", StringComparison.OrdinalIgnoreCase))
+            {
+                return SearchGoodreadsForNewEntity(title);
+            }
+
             var books = SearchForNewBook(title, null, false);
 
             var result = new List<object>();
@@ -418,6 +428,56 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                 if (!result.Contains(author))
                 {
                     result.Add(author);
+                }
+
+                result.Add(book);
+            }
+
+            return result;
+        }
+
+        // Goodreads has no general-purpose title search reachable from this client (see
+        // GoodreadsSearchProxy - that one goes through bookinfo.pro, which is exactly what this
+        // is trying to avoid). What it does have is a reliable name-to-author resolver
+        // (SearchAuthorByName) plus a full book list once you have the author id, so "search
+        // Goodreads for X" here means "find the author named X and list everything of theirs" -
+        // the same shape SearchByGoodreadsAuthorId already uses for an explicit "author:<id>"
+        // query, just entered by name instead of by id.
+        private List<object> SearchGoodreadsForNewEntity(string title)
+        {
+            var authorResult = _goodreadsProxy.SearchAuthorByName(title);
+
+            if (authorResult == null)
+            {
+                return new List<object>();
+            }
+
+            Author author;
+            try
+            {
+                author = GetAuthorInfo(authorResult.ForeignAuthorId, false, "goodreads");
+            }
+            catch (AuthorNotFoundException)
+            {
+                return new List<object>();
+            }
+
+            var books = author.Books.Value;
+            var authors = new Dictionary<string, AuthorMetadata> { { authorResult.ForeignAuthorId, author.Metadata.Value } };
+
+            // Mirrors SearchForNewEntity's own dedup below: AddDbIds may swap book.Author for an
+            // existing local record (with its real db id), which is the copy that needs to end up
+            // in the result, not the fresh-from-Goodreads one still held in `author`.
+            var result = new List<object>();
+            foreach (var book in books)
+            {
+                AddDbIds(authorResult.ForeignAuthorId, book, authors);
+
+                var bookAuthor = book.Author.Value;
+
+                if (!result.Contains(bookAuthor))
+                {
+                    result.Add(bookAuthor);
                 }
 
                 result.Add(book);
