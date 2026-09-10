@@ -328,7 +328,13 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Manual
                     var edition = _editionService.GetEditionByForeignEditionId(file.ForeignEditionId);
                     if (edition == null)
                     {
-                        var tuple = _bookInfo.GetBookInfo(book.ForeignBookId);
+                        // Route through the author's own pinned metadata source (goodreads, hardcover,
+                        // etc), same as RefreshBookService/AddBookService - otherwise this always falls
+                        // through to the legacy bookinfo.pro lookup regardless of what the author is
+                        // actually pinned to, which fails or returns mismatched edition data for authors
+                        // pinned to a source bookinfo.pro doesn't serve that book/edition from.
+                        var metadataSource = author.Metadata.Value.MetadataSource;
+                        var tuple = _bookInfo.GetBookInfo(book.ForeignBookId, metadataSource);
                         edition = tuple.Item2.Editions.Value.SingleOrDefault(x => x.ForeignEditionId == file.ForeignEditionId);
                     }
 
