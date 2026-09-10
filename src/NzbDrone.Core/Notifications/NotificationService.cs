@@ -278,13 +278,25 @@ namespace NzbDrone.Core.Notifications
 
         public void Handle(BookFileDeletedEvent message)
         {
+            // The edition a BookFile pointed at can already be gone by the time this fires - e.g.
+            // a Metadata Source switch deletes an edition out from under a file (see
+            // RefreshEditionService), and the orphaned file only gets cleaned up/replaced later
+            // during a subsequent import. Nothing useful to notify about without a book to report
+            // on, so skip rather than let the null Edition crash the whole event handler.
+            var edition = message.BookFile.Edition.Value;
+
+            if (edition == null)
+            {
+                return;
+            }
+
             var deleteMessage = new BookFileDeleteMessage();
 
-            var book = new List<Book> { message.BookFile.Edition.Value.Book };
+            var book = new List<Book> { edition.Book };
 
             deleteMessage.Message = GetMessage(message.BookFile.Author, book, message.BookFile.Quality);
             deleteMessage.BookFile = message.BookFile;
-            deleteMessage.Book = message.BookFile.Edition.Value.Book;
+            deleteMessage.Book = edition.Book;
             deleteMessage.Reason = message.Reason;
 
             foreach (var notification in _notificationFactory.OnBookFileDeleteEnabled())

@@ -278,7 +278,17 @@ namespace Readarr.Api.V1.Books
                 return;
             }
 
-            BroadcastResourceChange(ModelAction.Updated, MapToResource(message.BookFile.Edition.Value.Book.Value, true));
+            // See NotificationService.Handle(BookFileDeletedEvent) for why Edition.Value can be
+            // null here - an orphaned file whose edition was already deleted (e.g. by a Metadata
+            // Source switch) has nothing to broadcast an update for.
+            var book = message.BookFile.Edition.Value?.Book?.Value;
+
+            if (book == null)
+            {
+                return;
+            }
+
+            BroadcastResourceChange(ModelAction.Updated, MapToResource(book, true));
         }
     }
 }
