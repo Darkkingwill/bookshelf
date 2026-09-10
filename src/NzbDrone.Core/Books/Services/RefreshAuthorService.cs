@@ -17,7 +17,6 @@ using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Profiles.Metadata;
-using NzbDrone.Core.RootFolders;
 
 namespace NzbDrone.Core.Books
 {
@@ -40,7 +39,6 @@ namespace NzbDrone.Core.Books
         private readonly IManageCommandQueue _commandQueueManager;
         private readonly IMediaFileService _mediaFileService;
         private readonly IHistoryService _historyService;
-        private readonly IRootFolderService _rootFolderService;
         private readonly ICheckIfAuthorShouldBeRefreshed _checkIfAuthorShouldBeRefreshed;
         private readonly IMonitorNewBookService _monitorNewBookService;
         private readonly IConfigService _configService;
@@ -58,7 +56,6 @@ namespace NzbDrone.Core.Books
                                     IManageCommandQueue commandQueueManager,
                                     IMediaFileService mediaFileService,
                                     IHistoryService historyService,
-                                    IRootFolderService rootFolderService,
                                     ICheckIfAuthorShouldBeRefreshed checkIfAuthorShouldBeRefreshed,
                                     IMonitorNewBookService monitorNewBookService,
                                     IConfigService configService,
@@ -76,7 +73,6 @@ namespace NzbDrone.Core.Books
             _commandQueueManager = commandQueueManager;
             _mediaFileService = mediaFileService;
             _historyService = historyService;
-            _rootFolderService = rootFolderService;
             _checkIfAuthorShouldBeRefreshed = checkIfAuthorShouldBeRefreshed;
             _monitorNewBookService = monitorNewBookService;
             _configService = configService;
@@ -360,7 +356,14 @@ namespace NzbDrone.Core.Books
             {
                 // some metadata has updated so rescan unmatched
                 // (but don't add new authors to reduce repeated searches against api)
-                var folders = _rootFolderService.All().Select(x => x.Path).ToList();
+                // Scoped to just the refreshed authors' own folders rather than every root
+                // folder - safe because AddNewAuthors is always false here, so this rescan
+                // was never responsible for discovering new author folders anyway (that's the
+                // separate scheduled RescanFoldersCommand with AddNewAuthors: true). Scanning
+                // every root folder on every single-author refresh made bulk refreshes (e.g.
+                // refreshing hundreds of authors back to back) queue up redundant full-library
+                // scans instead of touching just the authors that changed.
+                var folders = _authorService.GetAuthors(authorIds).Select(x => x.Path).ToList();
 
                 _commandQueueManager.Push(new RescanFoldersCommand(folders, FilterFilesType.Matched, false, authorIds));
             }
