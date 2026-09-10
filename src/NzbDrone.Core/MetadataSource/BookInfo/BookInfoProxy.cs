@@ -623,8 +623,28 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
                 return legacyResults;
             }
 
+            // The local proxy found nothing (or is unreachable) - try real Goodreads directly
+            // before falling through to unrelated providers below, since it's the same
+            // authoritative source the local proxy's own cache is built from, just fetched
+            // live instead of pre-seeded. See SearchGoodreadsForNewEntity for why this only
+            // works as an author-name search, not a general title search - that's a real
+            // Goodreads API limitation, not something specific to this fallback.
+            _logger.Info("Legacy search returned no results for '{0}', trying Goodreads directly", title);
+            try
+            {
+                var goodreadsResults = SearchGoodreadsForNewEntity(title).OfType<Book>().ToList();
+                if (goodreadsResults.Any())
+                {
+                    return goodreadsResults;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Direct Goodreads search failed for '{0}'", title);
+            }
+
             // Fall back to multi-provider search
-            _logger.Info("Legacy search returned no results for '{0}', trying metadata providers", title);
+            _logger.Info("Goodreads search returned no results for '{0}', trying metadata providers", title);
             try
             {
                 var searchQuery = author != null ? $"{title} {author}" : title;
