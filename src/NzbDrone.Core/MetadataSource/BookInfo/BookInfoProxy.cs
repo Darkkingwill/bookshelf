@@ -172,17 +172,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         {
             if (metadataSource.Equals("goodreads", StringComparison.OrdinalIgnoreCase))
             {
-                var book = _goodreadsProxy.GetBookInfo(foreignBookId);
-
-                if (book?.AuthorMetadata?.Value == null)
-                {
-                    throw new BookNotFoundException(foreignBookId);
-                }
-
-                var bookAuthorMetadata = book.AuthorMetadata.Value;
-                bookAuthorMetadata.MetadataSource = "goodreads";
-
-                return Tuple.Create(bookAuthorMetadata.ForeignAuthorId, book, new List<AuthorMetadata> { bookAuthorMetadata });
+                return GetGoodreadsBookInfo(foreignBookId);
             }
 
             // Any other tag reaching here (googlebooks/openlibrary/audible/rreadingglasses) means
@@ -193,6 +183,55 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             // Best-effort: these providers were never the origin of a bare legacy id, so this
             // will usually just fail cleanly rather than resolve.
             return GetBookInfoFromProvider(metadataSource, foreignBookId, foreignBookId);
+        }
+
+        // foreignBookId here is always a work id - the id space every caller of GetBookInfo
+        // actually deals in (search results, PollBook, an author's synced book list). Try the
+        // self-hosted rreading-glasses proxy first: its work/{id} route resolves a work to its
+        // real editions correctly and is backed by a large pre-seeded cache, unlike
+        // GoodreadsProxy.GetBookInfo, which only understands edition-level ids and hits real
+        // goodreads.com directly under this app's own account - treating a work id as an
+        // edition id there silently returns a wrong, unrelated book (two different id spaces
+        // that happen to share numbers). Only fall back to hitting Goodreads directly if the
+        // local proxy is unreachable; a clean "not found" from it is trusted as-is rather than
+        // retried against the other id space.
+        private Tuple<string, Book, List<AuthorMetadata>> GetGoodreadsBookInfo(string foreignBookId)
+        {
+            Tuple<string, Book, List<AuthorMetadata>> tuple;
+
+            try
+            {
+                tuple = PollBook(foreignBookId);
+            }
+            catch (BookNotFoundException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Local metadata proxy unreachable for work {0}, falling back to Goodreads directly", foreignBookId);
+
+                var book = _goodreadsProxy.GetBookInfo(foreignBookId);
+
+                if (book?.AuthorMetadata?.Value == null)
+                {
+                    throw new BookNotFoundException(foreignBookId);
+                }
+
+                var bookAuthorMetadata = book.AuthorMetadata.Value;
+                tuple = Tuple.Create(bookAuthorMetadata.ForeignAuthorId, book, new List<AuthorMetadata> { bookAuthorMetadata });
+            }
+
+            // Caller explicitly asked for goodreads, so tag it regardless of which path
+            // resolved it - PollBook's own legacy mapping leaves this unset, since a bare id
+            // there is otherwise source-agnostic, but downstream refreshes need this to keep
+            // routing back here.
+            foreach (var authorMetadata in tuple.Item3)
+            {
+                authorMetadata.MetadataSource = "goodreads";
+            }
+
+            return tuple;
         }
 
         // Book/author IDs sourced from a fallback metadata provider are synthesized as
