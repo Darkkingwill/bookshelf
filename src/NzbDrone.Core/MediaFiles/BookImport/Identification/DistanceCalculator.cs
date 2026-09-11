@@ -22,9 +22,54 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
         private static readonly RegexReplace CleanTitleCruft = new RegexReplace(@"\((?:unabridged)\)", string.Empty, RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+        // Tag writers commonly emit "Author - Series NN - Title". Split on a dashes-with-spaces
+        // separator only, so hyphenated words ("Well-Being") and negative-looking numbers survive.
+        private static readonly Regex TitleSeparatorRegex = new Regex(@"\s+-\s+", RegexOptions.Compiled);
+
         private static readonly List<string> EbookFormats = new List<string> { "Kindle Edition", "Nook", "ebook" };
 
         private static readonly List<string> AudiobookFormats = new List<string> { "Audiobook", "Audio CD", "Audio Cassette", "Audible Audio", "CD-ROM", "MP3 CD" };
+
+        // A file title tagged "Author - Series NN - Title" carries a prefix that every book by
+        // that author in that series shares. Because the prefix is most of the string it lends
+        // near-identical similarity to every candidate, leaving the title - the only part that
+        // actually discriminates - swamped. Seen live on a 13-book series: the correct book
+        // scored 0.26388 and a wrong sibling 0.25390, so the sibling won by 0.01 and 5 of 13
+        // folders were misfiled essentially at random. Offering the trailing segments as
+        // alternatives lets the comparison run title against title. AddString takes the minimum
+        // over the cross product, so an extra variant can only lower a candidate's distance -
+        // and it lowers the book the file actually names far more than it lowers the others.
+        private static List<string> GetFileTitleVariants(string title, string authorName)
+        {
+            var variants = new List<string> { title, CleanTitleCruft.Replace(title) };
+
+            // "Author: Title" is handled for the edition side already; do the same for the file.
+            if (authorName.IsNotNullOrWhiteSpace())
+            {
+                var (main, _) = title.SplitBookTitle(authorName);
+                variants.Add(main);
+            }
+
+            var parts = TitleSeparatorRegex.Split(title);
+
+            // Only for genuinely prefixed titles. A long run of separators is more likely to be
+            // a compilation listing several works than an "Author - Series - Title" prefix.
+            if (parts.Length > 1 && parts.Length <= 4)
+            {
+                for (var i = 1; i < parts.Length; i++)
+                {
+                    var suffix = string.Join(" - ", parts.Skip(i));
+
+                    // Too short to identify anything; would match almost any candidate.
+                    if (suffix.Length >= 4)
+                    {
+                        variants.Add(suffix);
+                    }
+                }
+            }
+
+            return variants.Where(x => x.IsNotNullOrWhiteSpace()).Distinct().ToList();
+        }
 
         public static Distance BookDistance(List<LocalBook> localTracks, Edition edition)
         {
@@ -69,7 +114,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
                 }
             }
 
-            var fileTitles = new[] { title, CleanTitleCruft.Replace(title) }.Distinct().ToList();
+            var fileTitles = GetFileTitleVariants(title, edition.Book.Value.AuthorMetadata.Value.Name);
 
             dist.AddString("book", fileTitles, titleOptions);
             Logger.Trace("book: '{0}' vs '{1}'; {2}", fileTitles.ConcatToString("' or '"), titleOptions.ConcatToString("' or '"), dist.NormalizedDistance());
