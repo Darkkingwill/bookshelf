@@ -324,10 +324,21 @@ namespace NzbDrone.Core.MediaFiles.BookImport
             foreach (var bookImport in bookImports)
             {
                 var book = bookImport.First().ImportDecision.Item.Book;
-                var edition = book.Editions.Value.Single(x => x.Monitored);
+
+                // Normally exactly one edition is monitored (set earlier in this same method via
+                // SetMonitored), but a large batch can carry more than one in-memory Book instance
+                // for the same underlying db row - e.g. two decisions that identified the same
+                // book independently within one scan. Only the instance SetMonitored actually ran
+                // against has the flag applied in memory; the others still report zero monitored
+                // editions even though the database itself is correct (confirmed live: after a
+                // crash here mid-batch, no book in the db was actually left without a monitored
+                // edition). Single() used to throw on that second instance and abort the rest of
+                // the batch's event publishing. Falling back to the first edition keeps this
+                // notification-only step from taking down an otherwise-successful import.
+                var edition = book.Editions.Value.FirstOrDefault(x => x.Monitored) ?? book.Editions.Value.FirstOrDefault();
                 var author = bookImport.First().ImportDecision.Item.Author;
 
-                if (bookImport.Where(e => e.Errors.Count == 0).ToList().Count > 0 && author != null && book != null)
+                if (edition != null && bookImport.Where(e => e.Errors.Count == 0).ToList().Count > 0 && author != null && book != null)
                 {
                     _eventAggregator.PublishEvent(new BookImportedEvent(
                         author,
