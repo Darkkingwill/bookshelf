@@ -626,13 +626,22 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             // The local proxy found nothing (or is unreachable) - try real Goodreads directly
             // before falling through to unrelated providers below, since it's the same
             // authoritative source the local proxy's own cache is built from, just fetched
-            // live instead of pre-seeded. See SearchGoodreadsForNewEntity for why this only
-            // works as an author-name search, not a general title search - that's a real
-            // Goodreads API limitation, not something specific to this fallback.
-            _logger.Info("Legacy search returned no results for '{0}', trying Goodreads directly", title);
+            // live instead of pre-seeded. SearchGoodreadsForNewEntity only works as an
+            // author-name search (a real Goodreads API limitation, not specific to this
+            // fallback) - so when a separate author name is known (e.g. CandidateService's
+            // disk-scan matching, which always passes both a book tag and an author tag),
+            // search Goodreads for THAT name and let the caller pick the matching title out
+            // of the author's full bibliography, the same pattern SearchByGoodreadsAuthorId
+            // already uses. Searching by `title` instead (the book's title, not an author's
+            // name) would only ever match an author who happens to be named after that book,
+            // which is never - confirmed live: every one of these lookups came back empty.
+            // Only fall back to treating the book title itself as an author-name guess when no
+            // author is known, which is the shape a plain author-search-box query takes.
+            var goodreadsNameQuery = author.IsNotNullOrWhiteSpace() ? author : title;
+            _logger.Info("Legacy search returned no results for '{0}', trying Goodreads directly for author '{1}'", title, goodreadsNameQuery);
             try
             {
-                var goodreadsResults = SearchGoodreadsForNewEntity(title).OfType<Book>().ToList();
+                var goodreadsResults = SearchGoodreadsForNewEntity(goodreadsNameQuery).OfType<Book>().ToList();
                 if (goodreadsResults.Any())
                 {
                     return goodreadsResults;
@@ -640,7 +649,7 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             }
             catch (Exception ex)
             {
-                _logger.Warn(ex, "Direct Goodreads search failed for '{0}'", title);
+                _logger.Warn(ex, "Direct Goodreads search failed for '{0}'", goodreadsNameQuery);
             }
 
             // Fall back to multi-provider search

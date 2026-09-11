@@ -5,6 +5,13 @@
 *.sh text eol=lf
 distribution/osx/Readarr text eol=lf
 
+# s6-overlay service definitions are plain-text configs with a strict parser
+# that chokes on a trailing \r (confirmed live: a CRLF checkout of the
+# `type` file broke container startup with "invalid type: must be oneshot,
+# longrun, or bundle"). These files have no extension for `*.sh`-style
+# matching to catch, so they need an explicit path rule.
+docker/root/etc/s6-overlay/** text eol=lf
+
 # Custom for Visual Studio
 *.cs     diff=csharp
 *.sln    merge=union

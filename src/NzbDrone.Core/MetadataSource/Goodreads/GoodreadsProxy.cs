@@ -136,14 +136,69 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             }
 
             var authorResource = httpResponse.Deserialize<AuthorResource>();
-            var bookList = httpResponse.Deserialize<AuthorBookListResource>();
 
             if (authorResource == null)
             {
                 throw new AuthorNotFoundException(foreignAuthorId.ToString());
             }
 
+            // author/show's own embedded <books> list is a short "best books" preview, not the
+            // bibliography - confirmed live: it silently capped a 72-book indie author at 10,
+            // which then made every book outside that 10 permanently unmatchable (nothing to
+            // score against, so titles like "The Vendetta" matched to the nearest of the 10
+            // instead of themselves - see BookInfoProxy's Goodreads-direct fallback, which feeds
+            // its candidates from here). author/list is the same data Goodreads' own site uses
+            // for an author's "all books" page, and paginates 30 at a time via <books start end
+            // total> attributes, so it has to be walked to completion rather than read once.
+            var bookList = GetAuthorBookList(foreignAuthorId, useCache);
+
             return MapAuthorShow(authorResource, bookList);
+        }
+
+        private List<BookResource> GetAuthorBookList(long foreignAuthorId, bool useCache)
+        {
+            var books = new List<BookResource>();
+            var page = 1;
+
+            while (true)
+            {
+                var httpRequest = _requestBuilder.Create()
+                    .SetSegment("route", $"author/list/{foreignAuthorId}")
+                    .AddQueryParam("format", "xml")
+                    .AddQueryParam("page", page)
+                    .Build();
+
+                httpRequest.AllowAutoRedirect = true;
+                httpRequest.SuppressHttpError = true;
+
+                var httpResponse = Execute(httpRequest, useCache, TimeSpan.FromDays(1));
+
+                if (httpResponse.HasHttpError)
+                {
+                    // Missing data for later pages shouldn't fail the whole author fetch -
+                    // return whatever pages succeeded rather than losing all of it.
+                    _logger.Warn("Failed to fetch author/list page {0} for author {1}, stopping pagination", page, foreignAuthorId);
+                    break;
+                }
+
+                var pageResource = httpResponse.Deserialize<AuthorBookListResource>();
+
+                if (pageResource?.List == null || !pageResource.List.Any())
+                {
+                    break;
+                }
+
+                books.AddRange(pageResource.List);
+
+                if (pageResource.Total <= 0 || pageResource.End >= pageResource.Total)
+                {
+                    break;
+                }
+
+                page++;
+            }
+
+            return books;
         }
 
         // Uses Goodreads' api_author_link method (GET api/author_url/<name>), which resolves
@@ -309,7 +364,7 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             return author;
         }
 
-        private static Author MapAuthorShow(AuthorResource resource, AuthorBookListResource bookList)
+        private static Author MapAuthorShow(AuthorResource resource, List<BookResource> bookList)
         {
             var metadata = new AuthorMetadata
             {
@@ -338,7 +393,7 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             // Each entry is a distinct Goodreads book (edition), grouped/keyed by its work id
             // downstream - MapBook already returns one Book per BookResource, so just dedupe
             // in case the same work shows up more than once (e.g. multiple editions listed).
-            var resources = (bookList?.List ?? new List<BookResource>())
+            var resources = (bookList ?? new List<BookResource>())
                 .Where(b => b.Work != null && b.Work.Id > 0)
                 .ToList();
 
