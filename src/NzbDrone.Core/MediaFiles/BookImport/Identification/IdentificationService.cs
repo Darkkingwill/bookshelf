@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Abstractions;
 using System.Linq;
 using NLog;
+using NzbDrone.Common;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.MediaFiles.BookImport.Aggregation;
@@ -130,10 +131,22 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
             IEnumerable<CandidateEdition> candidateReleases = _candidateService.GetDbCandidatesFromTags(localBookRelease, idOverrides, config.IncludeExisting);
 
+            // A candidate carries every file already attributed to it, and those files get folded into the
+            // set that BookDistance scores by majority vote.  A candidate holding more files than the folder
+            // being identified would therefore outvote that folder and absorb it, so restrict the extra files
+            // to the folders we are actually identifying.  Partial and multi-disc re-imports still work
+            // (their existing files are in the same folders), but cross-folder contamination cannot happen.
+            var localFolders = new HashSet<string>(
+                localBookRelease.LocalBooks
+                    .Select(x => Path.GetDirectoryName(x.Path))
+                    .Where(x => x.IsNotNullOrWhiteSpace()),
+                PathEqualityComparer.Instance);
+
             // convert all the TrackFiles that represent extra files to List<LocalTrack>
             // local candidates are actually a list so this is fine to enumerate
             var allLocalTracks = ToLocalTrack(candidateReleases
                 .SelectMany(x => x.ExistingFiles)
+                .Where(x => localFolders.Contains(Path.GetDirectoryName(x.Path) ?? string.Empty))
                 .DistinctBy(x => x.Path), localBookRelease);
 
             _logger.Debug($"Retrieved {allLocalTracks.Count} possible tracks in {watch.ElapsedMilliseconds}ms");
