@@ -19,8 +19,13 @@ namespace NzbDrone.Core.HealthCheck.Checks
     // ("Plain Truth" vs "Plain Truth: A Novel"), omnibus/series-collection titles, and shared
     // recurring words (a character name repeated across several book titles) all produced
     // false hits under substring matching but score correctly under fuzzy matching.
+    // Results are cached until something re-runs the check, so deletion has to be a trigger
+    // too: without it a file that was removed or repointed keeps being reported for up to the
+    // scheduled interval (6 hours), which reads as the library still being wrong long after it
+    // was fixed.
     [CheckOn(typeof(TrackImportedEvent))]
     [CheckOn(typeof(BookImportedEvent))]
+    [CheckOn(typeof(BookFileDeletedEvent))]
     public class BookFileTitleMismatchCheck : HealthCheckBase
     {
         private const int MinNormalizedTitleLength = 4;
