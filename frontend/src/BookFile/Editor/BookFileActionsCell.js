@@ -6,6 +6,7 @@ import ConfirmModal from 'Components/Modal/ConfirmModal';
 import TableRowCell from 'Components/Table/Cells/TableRowCell';
 import { icons, kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
+import ChangeBookModal from './ChangeBookModal';
 import styles from './BookFileActionsCell.css';
 
 class BookFileActionsCell extends Component {
@@ -18,7 +19,8 @@ class BookFileActionsCell extends Component {
 
     this.state = {
       isDetailsModalOpen: false,
-      isConfirmDeleteModalOpen: false
+      isConfirmDeleteModalOpen: false,
+      isChangeBookModalOpen: false
     };
   }
 
@@ -31,6 +33,14 @@ class BookFileActionsCell extends Component {
 
   onDetailsModalClose = () => {
     this.setState({ isDetailsModalOpen: false });
+  };
+
+  onChangeBookPress = () => {
+    this.setState({ isChangeBookModalOpen: true });
+  };
+
+  onChangeBookModalClose = () => {
+    this.setState({ isChangeBookModalOpen: false });
   };
 
   onDeleteFilePress = () => {
@@ -53,12 +63,15 @@ class BookFileActionsCell extends Component {
 
     const {
       id,
+      authorId,
+      bookId,
       path
     } = this.props;
 
     const {
       isDetailsModalOpen,
-      isConfirmDeleteModalOpen
+      isConfirmDeleteModalOpen,
+      isChangeBookModalOpen
     } = this.state;
 
     return (
@@ -80,6 +93,14 @@ class BookFileActionsCell extends Component {
             />
         }
         {
+          path && !!authorId &&
+            <IconButton
+              name={icons.EDIT}
+              title={translate('ChangeBook')}
+              onPress={this.onChangeBookPress}
+            />
+        }
+        {
           path &&
             <IconButton
               name={icons.DELETE}
@@ -91,6 +112,14 @@ class BookFileActionsCell extends Component {
           isOpen={isDetailsModalOpen}
           onModalClose={this.onDetailsModalClose}
           id={id}
+        />
+
+        <ChangeBookModal
+          isOpen={isChangeBookModalOpen}
+          authorId={authorId}
+          bookFileIds={[id]}
+          currentBookId={bookId}
+          onModalClose={this.onChangeBookModalClose}
         />
 
         <ConfirmModal
@@ -110,6 +139,8 @@ class BookFileActionsCell extends Component {
 
 BookFileActionsCell.propTypes = {
   id: PropTypes.number.isRequired,
+  authorId: PropTypes.number,
+  bookId: PropTypes.number,
   path: PropTypes.string,
   deleteBookFile: PropTypes.func.isRequired
 };

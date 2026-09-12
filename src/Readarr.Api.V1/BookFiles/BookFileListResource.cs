@@ -7,5 +7,6 @@ namespace Readarr.Api.V1.BookFiles
     {
         public List<int> BookFileIds { get; set; }
         public QualityModel Quality { get; set; }
+        public int? EditionId { get; set; }
     }
 }

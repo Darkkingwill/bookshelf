@@ -1,0 +1,9 @@
+.title {
+  composes: cell from '~Components/Table/Cells/TableRowCell.css';
+}
+
+.current {
+  margin-left: 10px;
+  color: var(--themeDarkColor);
+  font-size: $smallFontSize;
+}

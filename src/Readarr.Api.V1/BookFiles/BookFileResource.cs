@@ -12,6 +12,7 @@ namespace Readarr.Api.V1.BookFiles
     {
         public int AuthorId { get; set; }
         public int BookId { get; set; }
+        public int EditionId { get; set; }
         public string Path { get; set; }
         public long Size { get; set; }
         public DateTime DateAdded { get; set; }
@@ -50,6 +51,7 @@ namespace Readarr.Api.V1.BookFiles
             {
                 Id = model.Id,
                 BookId = model.Edition.Value?.BookId ?? 0,
+                EditionId = model.EditionId,
                 Path = model.Path,
                 Size = model.Size,
                 DateAdded = model.DateAdded,
@@ -72,6 +74,7 @@ namespace Readarr.Api.V1.BookFiles
 
                 AuthorId = author.Id,
                 BookId = model.Edition.Value?.BookId ?? 0,
+                EditionId = model.EditionId,
                 Path = model.Path,
                 Size = model.Size,
                 DateAdded = model.DateAdded,

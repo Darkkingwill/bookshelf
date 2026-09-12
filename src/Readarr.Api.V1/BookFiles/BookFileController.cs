@@ -29,6 +29,7 @@ namespace Readarr.Api.V1.BookFiles
         private readonly IMetadataTagService _metadataTagService;
         private readonly IAuthorService _authorService;
         private readonly IBookService _bookService;
+        private readonly IEditionService _editionService;
         private readonly IUpgradableSpecification _upgradableSpecification;
 
         public BookFileController(IBroadcastSignalRMessage signalRBroadcaster,
@@ -37,6 +38,7 @@ namespace Readarr.Api.V1.BookFiles
                                IMetadataTagService metadataTagService,
                                IAuthorService authorService,
                                IBookService bookService,
+                               IEditionService editionService,
                                IUpgradableSpecification upgradableSpecification)
             : base(signalRBroadcaster)
         {
@@ -45,6 +47,7 @@ namespace Readarr.Api.V1.BookFiles
             _metadataTagService = metadataTagService;
             _authorService = authorService;
             _bookService = bookService;
+            _editionService = editionService;
             _upgradableSpecification = upgradableSpecification;
         }
 
@@ -130,7 +133,28 @@ namespace Readarr.Api.V1.BookFiles
         public ActionResult<BookFileResource> SetQuality(BookFileResource bookFileResource)
         {
             var bookFile = _mediaFileService.Get(bookFileResource.Id);
-            bookFile.Quality = bookFileResource.Quality;
+
+            if (bookFileResource.Quality != null)
+            {
+                bookFile.Quality = bookFileResource.Quality;
+            }
+
+            // Repointing a file at a different edition is how a mis-identified file gets
+            // corrected without deleting it and re-importing through interactive import.
+            // Zero means "not supplied" rather than "clear it", so that a client sending
+            // only a quality change does not silently unmap the file.
+            if (bookFileResource.EditionId > 0 && bookFileResource.EditionId != bookFile.EditionId)
+            {
+                var edition = _editionService.GetEdition(bookFileResource.EditionId);
+
+                if (edition == null)
+                {
+                    throw new NzbDroneClientException(HttpStatusCode.NotFound, "Edition not found");
+                }
+
+                bookFile.EditionId = edition.Id;
+            }
+
             _mediaFileService.Update(bookFile);
             return Accepted(bookFile.Id);
         }
@@ -140,11 +164,30 @@ namespace Readarr.Api.V1.BookFiles
         {
             var bookFiles = _mediaFileService.Get(resource.BookFileIds);
 
+            // Resolve the edition once: every selected file is being pointed at the same one,
+            // and a bad id should fail before any file is touched rather than half way through.
+            Edition edition = null;
+
+            if (resource.EditionId.HasValue && resource.EditionId.Value > 0)
+            {
+                edition = _editionService.GetEdition(resource.EditionId.Value);
+
+                if (edition == null)
+                {
+                    throw new NzbDroneClientException(HttpStatusCode.NotFound, "Edition not found");
+                }
+            }
+
             foreach (var bookFile in bookFiles)
             {
                 if (resource.Quality != null)
                 {
                     bookFile.Quality = resource.Quality;
+                }
+
+                if (edition != null)
+                {
+                    bookFile.EditionId = edition.Id;
                 }
             }
 

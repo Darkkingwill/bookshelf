@@ -203,7 +203,8 @@ export const actionHandlers = handleThunks({
   [UPDATE_BOOK_FILES]: function(getState, payload, dispatch) {
     const {
       bookFileIds,
-      quality
+      quality,
+      editionId
     } = payload;
 
     dispatch(set({ section, isSaving: true }));
@@ -214,6 +215,10 @@ export const actionHandlers = handleThunks({
 
     if (quality) {
       requestData.quality = quality;
+    }
+
+    if (editionId) {
+      requestData.editionId = editionId;
     }
 
     const promise = createAjaxRequest({
@@ -234,6 +239,13 @@ export const actionHandlers = handleThunks({
 
           if (quality) {
             props.quality = quality;
+          }
+
+          if (editionId) {
+            // The file now belongs to a different book, so the row it is listed under is
+            // no longer correct; take the server's word for where it landed.
+            props.bookId = bookFile.bookId;
+            props.editionId = bookFile.editionId;
           }
 
           return updateItem({ section, id, ...props });

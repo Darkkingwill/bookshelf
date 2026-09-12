@@ -12,6 +12,8 @@ import styles from './BookFileEditorRow.css';
 function BookFileEditorRow(props) {
   const {
     id,
+    authorId,
+    bookId,
     path,
     size,
     dateAdded,
@@ -57,6 +59,8 @@ function BookFileEditorRow(props) {
 
       <BookFileActionsCell
         id={id}
+        authorId={authorId}
+        bookId={bookId}
         path={path}
         deleteBookFile={deleteBookFile}
       />
@@ -66,6 +70,8 @@ function BookFileEditorRow(props) {
 
 BookFileEditorRow.propTypes = {
   id: PropTypes.number.isRequired,
+  authorId: PropTypes.number,
+  bookId: PropTypes.number,
   path: PropTypes.string.isRequired,
   size: PropTypes.number.isRequired,
   quality: PropTypes.object.isRequired,
