@@ -30,6 +30,7 @@ namespace Readarr.Api.V1.BookFiles
         private readonly IAuthorService _authorService;
         private readonly IBookService _bookService;
         private readonly IEditionService _editionService;
+        private readonly IEventAggregator _eventAggregator;
         private readonly IUpgradableSpecification _upgradableSpecification;
 
         public BookFileController(IBroadcastSignalRMessage signalRBroadcaster,
@@ -39,6 +40,7 @@ namespace Readarr.Api.V1.BookFiles
                                IAuthorService authorService,
                                IBookService bookService,
                                IEditionService editionService,
+                               IEventAggregator eventAggregator,
                                IUpgradableSpecification upgradableSpecification)
             : base(signalRBroadcaster)
         {
@@ -48,6 +50,7 @@ namespace Readarr.Api.V1.BookFiles
             _authorService = authorService;
             _bookService = bookService;
             _editionService = editionService;
+            _eventAggregator = eventAggregator;
             _upgradableSpecification = upgradableSpecification;
         }
 
@@ -133,6 +136,7 @@ namespace Readarr.Api.V1.BookFiles
         public ActionResult<BookFileResource> SetQuality(BookFileResource bookFileResource)
         {
             var bookFile = _mediaFileService.Get(bookFileResource.Id);
+            var changedEdition = 0;
 
             if (bookFileResource.Quality != null)
             {
@@ -153,9 +157,16 @@ namespace Readarr.Api.V1.BookFiles
                 }
 
                 bookFile.EditionId = edition.Id;
+                changedEdition = edition.Id;
             }
 
             _mediaFileService.Update(bookFile);
+
+            if (changedEdition > 0)
+            {
+                _eventAggregator.PublishEvent(new BookFileEditionChangedEvent(new List<BookFile> { bookFile }, changedEdition));
+            }
+
             return Accepted(bookFile.Id);
         }
 
@@ -192,6 +203,11 @@ namespace Readarr.Api.V1.BookFiles
             }
 
             _mediaFileService.Update(bookFiles);
+
+            if (edition != null)
+            {
+                _eventAggregator.PublishEvent(new BookFileEditionChangedEvent(bookFiles, edition.Id));
+            }
 
             return Accepted(bookFiles.ConvertAll(f => f.ToResource(bookFiles.First().Author.Value, _upgradableSpecification)));
         }

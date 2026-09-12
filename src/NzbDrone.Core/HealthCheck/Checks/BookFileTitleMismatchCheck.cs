@@ -26,6 +26,7 @@ namespace NzbDrone.Core.HealthCheck.Checks
     [CheckOn(typeof(TrackImportedEvent))]
     [CheckOn(typeof(BookImportedEvent))]
     [CheckOn(typeof(BookFileDeletedEvent))]
+    [CheckOn(typeof(BookFileEditionChangedEvent))]
     public class BookFileTitleMismatchCheck : HealthCheckBase
     {
         private const int MinNormalizedTitleLength = 4;
