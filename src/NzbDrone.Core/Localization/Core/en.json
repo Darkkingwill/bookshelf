@@ -888,7 +888,7 @@
   "Search": "Search",
   "SearchAll": "Search All",
   "SearchBook": "Search Book",
-  "SearchBoxPlaceHolder": "e.g. War and Peace, goodreads:656, isbn:067003469X, asin:B00JCDK5ME",
+  "SearchBoxPlaceHolder": "e.g. War and Peace, goodreads:656, a Goodreads book link, isbn:067003469X, asin:B00JCDK5ME",
   "SearchFiltered": "Search Filtered",
   "SearchForCustomTerm": "Search for a different term...",
   "SearchForAllCutoffUnmetBooks": "Search for all Cutoff Unmet books",

@@ -447,17 +447,23 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
 
         public List<object> SearchForNewEntity(string title, string source = null)
         {
+            // A pasted Goodreads link is an exact id, so it goes through the id lookup below even when
+            // the Goodreads source is selected - that path is a name search and would treat the URL as
+            // an author's name.
+            var normalized = GoodreadsLinkParser.Normalize(title);
+            var isGoodreadsLink = normalized != title;
+
             // Only "goodreads" gets its own path - same reasoning as GetAuthorInfo/GetBookInfo's
             // source routing: it's the one source with an independently-verified id space and a
             // working direct client, so it's worth bypassing bookinfo.pro's own (occasionally
             // wrong) title-to-id mapping for. Anything else (null, "hardcover", or an unrecognized
             // value) keeps the existing default behavior unchanged.
-            if (source.IsNotNullOrWhiteSpace() && source.Equals("goodreads", StringComparison.OrdinalIgnoreCase))
+            if (!isGoodreadsLink && source.IsNotNullOrWhiteSpace() && source.Equals("goodreads", StringComparison.OrdinalIgnoreCase))
             {
                 return SearchGoodreadsForNewEntity(title);
             }
 
-            var books = SearchForNewBook(title, null, false);
+            var books = SearchForNewBook(normalized, null, false);
 
             var result = new List<object>();
             foreach (var book in books)
@@ -559,6 +565,8 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
 
         public List<Book> SearchForNewBook(string title, string author, bool getAllEditions = true)
         {
+            title = GoodreadsLinkParser.Normalize(title);
+
             var q = title.ToLower().Trim();
             if (author != null)
             {
