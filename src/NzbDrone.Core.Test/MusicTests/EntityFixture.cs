@@ -81,11 +81,18 @@ namespace NzbDrone.Core.Test.MusicTests
         {
             var item1 = _fixture.Create<AuthorMetadata>();
             var item2 = _fixture.Create<AuthorMetadata>();
+            var originalSource = item1.MetadataSource;
 
             item1.Should().NotBe(item2);
 
             item1.UseMetadataFrom(item2);
             item1.UseDbFieldsFrom(item2);
+
+            // MetadataSource is pinned when the author is added (or switched by the user) and must
+            // survive every refresh, so it is deliberately not replicated. Everything else is.
+            item1.MetadataSource.Should().Be(originalSource);
+
+            item1.MetadataSource = item2.MetadataSource;
             item1.Should().Be(item2);
         }
 
