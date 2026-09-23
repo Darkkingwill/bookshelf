@@ -93,8 +93,10 @@ function createMapDispatchToProps(dispatch, props) {
       dispatch(push(`${window.Readarr.urlBase}/book/${titleSlug}`));
     },
 
-    onGoToAddNewAuthor(query) {
-      dispatch(push(`${window.Readarr.urlBase}/add/search?term=${encodeURIComponent(query)}`));
+    onGoToAddNewAuthor(query, source) {
+      const sourceParam = source ? `&source=${encodeURIComponent(source)}` : '';
+
+      dispatch(push(`${window.Readarr.urlBase}/add/search?term=${encodeURIComponent(query)}${sourceParam}`));
     }
   };
 }

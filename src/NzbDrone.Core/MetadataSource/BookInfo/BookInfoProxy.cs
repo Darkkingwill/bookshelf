@@ -456,21 +456,28 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             // Only "goodreads" gets its own path - same reasoning as GetAuthorInfo/GetBookInfo's
             // source routing: it's the one source with an independently-verified id space and a
             // working direct client, so it's worth bypassing bookinfo.pro's own (occasionally
-            // wrong) title-to-id mapping for. Anything else (null, "hardcover", or an unrecognized
-            // value) keeps the existing default behavior unchanged.
+            // wrong) title-to-id mapping for. Any other non-empty value is a provider key, handled below.
             if (!isGoodreadsLink && source.IsNotNullOrWhiteSpace() && source.Equals("goodreads", StringComparison.OrdinalIgnoreCase))
             {
                 return SearchGoodreadsForNewEntity(title);
             }
 
-            var books = SearchForNewBook(normalized, null, false);
+            var isProviderSearch = !isGoodreadsLink && source.IsNotNullOrWhiteSpace();
+
+            // Any other non-empty source is a metadata provider key (hardcover, audible, ...):
+            // ask only that provider instead of the default lookup chain.
+            var books = isProviderSearch
+                ? _metadataProviderService.SearchBooks(source, normalized).Select(MapMetadataResultToBook).ToList()
+                : SearchForNewBook(normalized, null, false);
 
             var result = new List<object>();
+            var seenAuthorIds = new HashSet<string>();
             foreach (var book in books)
             {
                 var author = book.Author.Value;
 
-                if (!result.Contains(author))
+                // Provider results each carry their own Author instance, so dedupe by id there.
+                if (isProviderSearch ? seenAuthorIds.Add(author.Metadata.Value.ForeignAuthorId) : !result.Contains(author))
                 {
                     result.Add(author);
                 }

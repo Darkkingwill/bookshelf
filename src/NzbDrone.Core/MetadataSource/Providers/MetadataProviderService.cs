@@ -17,6 +17,7 @@ namespace NzbDrone.Core.MetadataSource.Providers
         List<MetadataSearchResult> SearchBooks(string query);
         List<MetadataSearchResult> SearchAuthors(string query);
         List<MetadataSearchResult> SearchAuthors(string providerKey, string query);
+        List<MetadataSearchResult> SearchBooks(string providerKey, string query);
         MetadataSearchResult SearchByIsbn(string isbn);
         MetadataSearchResult SearchByAsin(string asin);
         MetadataAuthorResult GetAuthorInfo(string providerKey, string foreignId);
@@ -154,6 +155,28 @@ namespace NzbDrone.Core.MetadataSource.Providers
             }
 
             return FuzzyMatcher.RankResults(allResults, query, 0.2);
+        }
+
+        // Single-provider counterpart of SearchBooks(query): no fallback to other providers, so
+        // "search Hardcover for X" only ever returns what Hardcover itself knows about.
+        public List<MetadataSearchResult> SearchBooks(string providerKey, string query)
+        {
+            var provider = ResolveProvider(providerKey);
+
+            if (provider == null)
+            {
+                return new List<MetadataSearchResult>();
+            }
+
+            try
+            {
+                return provider.SearchBooks(query) ?? new List<MetadataSearchResult>();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "SearchBooks failed for provider {0}", providerKey);
+                return new List<MetadataSearchResult>();
+            }
         }
 
         public List<MetadataSearchResult> SearchAuthors(string query)

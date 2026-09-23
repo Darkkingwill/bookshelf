@@ -6,6 +6,7 @@ import Icon from 'Components/Icon';
 import keyboardShortcuts, { shortcuts } from 'Components/keyboardShortcuts';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import { icons } from 'Helpers/Props';
+import fetchSearchSources from 'Utilities/fetchSearchSources';
 import translate from 'Utilities/String/translate';
 import AuthorSearchResult from './AuthorSearchResult';
 import BookSearchResult from './BookSearchResult';
@@ -27,15 +28,24 @@ class AuthorSearchInput extends Component {
 
     this.state = {
       value: '',
-      suggestions: []
+      suggestions: [],
+      sources: []
     };
   }
 
   componentDidMount() {
+    fetchSearchSources().then((sources) => {
+      if (!this._isUnmounted) {
+        this.setState({ sources });
+      }
+    });
+
     this.props.bindShortcut(shortcuts.AUTHOR_SEARCH_INPUT.key, this.focusInput);
   }
 
   componentWillUnmount() {
+    this._isUnmounted = true;
+
     if (this._worker) {
       this._worker.removeEventListener('message', this.onSuggestionsReceived, false);
       this._worker.terminate();
@@ -93,7 +103,7 @@ class AuthorSearchInput extends Component {
     if (item.type === ADD_NEW_TYPE) {
       return (
         <div className={styles.addNewAuthorSuggestion}>
-          Search for {query}
+          {item.sourceName ? `Search ${item.sourceName} for ${query}` : `Search for ${query}`}
         </div>
       );
     }
@@ -279,7 +289,7 @@ class AuthorSearchInput extends Component {
 
   onSuggestionSelected = (event, { suggestion }) => {
     if (suggestion.type === ADD_NEW_TYPE) {
-      this.props.onGoToAddNewAuthor(this.state.value);
+      this.props.onGoToAddNewAuthor(this.state.value, suggestion.source);
     } else {
       this.goToItem(suggestion);
     }
@@ -292,7 +302,8 @@ class AuthorSearchInput extends Component {
     const {
       value,
       loading,
-      suggestions
+      suggestions,
+      sources
     } = this.state;
 
     const suggestionGroups = [];
@@ -311,7 +322,13 @@ class AuthorSearchInput extends Component {
         {
           type: ADD_NEW_TYPE,
           title: value
-        }
+        },
+        ...sources.map((x) => ({
+          type: ADD_NEW_TYPE,
+          title: value,
+          source: x.key,
+          sourceName: x.name
+        }))
       ]
     });
 

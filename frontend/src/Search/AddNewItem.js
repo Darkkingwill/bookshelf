@@ -10,21 +10,12 @@ import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import PageContent from 'Components/Page/PageContent';
 import PageContentBody from 'Components/Page/PageContentBody';
 import { icons, kinds } from 'Helpers/Props';
+import fetchSearchSources from 'Utilities/fetchSearchSources';
 import getErrorMessage from 'Utilities/Object/getErrorMessage';
 import translate from 'Utilities/String/translate';
 import AddNewAuthorSearchResultConnector from './Author/AddNewAuthorSearchResultConnector';
 import AddNewBookSearchResultConnector from './Book/AddNewBookSearchResultConnector';
 import styles from './AddNewItem.css';
-
-// "Default" leaves the choice to whatever's globally configured (bookinfo.pro, normally) - its
-// title search occasionally maps a name to the wrong id (see the fork's Goodreads-pinning work).
-// "Goodreads (direct)" instead resolves the term as an author name straight against Goodreads
-// and lists everything of theirs, sidestepping that proxy entirely - the same trusted path an
-// author already pinned to Goodreads uses for refreshes.
-const searchSourceOptions = [
-  { key: '', value: 'Default' },
-  { key: 'goodreads', value: 'Goodreads (direct)' }
-];
 
 class AddNewItem extends Component {
 
@@ -36,13 +27,20 @@ class AddNewItem extends Component {
 
     this.state = {
       term: props.term || '',
-      source: '',
+      source: props.source || '',
+      sources: [],
       isFetching: false
     };
   }
 
   componentDidMount() {
     const term = this.state.term;
+
+    fetchSearchSources().then((sources) => {
+      if (!this._isUnmounted) {
+        this.setState({ sources });
+      }
+    });
 
     if (term) {
       this.props.onSearchChange(term, this.state.source);
@@ -52,20 +50,27 @@ class AddNewItem extends Component {
   componentDidUpdate(prevProps) {
     const {
       term,
+      source,
       isFetching
     } = this.props;
 
-    if (term && term !== prevProps.term) {
+    if (term && (term !== prevProps.term || source !== prevProps.source)) {
+      // Coming from the header search: adopt the source it picked along with the term.
       this.setState({
         term,
+        source: source || '',
         isFetching: true
       });
-      this.props.onSearchChange(term, this.state.source);
+      this.props.onSearchChange(term, source || '');
     } else if (isFetching !== prevProps.isFetching) {
       this.setState({
         isFetching
       });
     }
+  }
+
+  componentWillUnmount() {
+    this._isUnmounted = true;
   }
 
   //
@@ -109,6 +114,10 @@ class AddNewItem extends Component {
 
     const term = this.state.term;
     const source = this.state.source;
+    const searchSourceOptions = [
+      { key: '', value: 'Default' },
+      ...this.state.sources.map((x) => ({ key: x.key, value: x.name }))
+    ];
     const isFetching = this.state.isFetching;
 
     return (
@@ -252,6 +261,7 @@ class AddNewItem extends Component {
 
 AddNewItem.propTypes = {
   term: PropTypes.string,
+  source: PropTypes.string,
   isFetching: PropTypes.bool.isRequired,
   error: PropTypes.object,
   isAdding: PropTypes.bool.isRequired,
