@@ -454,6 +454,13 @@ namespace NzbDrone.Core.Books
         {
             var data = GetSkyhookData(book);
 
+            // The provider no longer knows this book (GetSkyhookData already logged it). Nothing to
+            // refresh from, so leave the local record alone instead of crashing.
+            if (data == null)
+            {
+                return false;
+            }
+
             return RefreshBookInfo(book, data.Books, data, false);
         }
 
