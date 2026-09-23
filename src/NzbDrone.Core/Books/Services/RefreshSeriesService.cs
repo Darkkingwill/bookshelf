@@ -98,7 +98,7 @@ namespace NzbDrone.Core.Books
             return local.Pinned;
         }
 
-        protected override Tuple<SeriesBookLink, List<SeriesBookLink>> GetMatchingExistingChildren(List<SeriesBookLink> existingChildren, SeriesBookLink remote)
+        protected override Tuple<SeriesBookLink, List<SeriesBookLink>> GetMatchingExistingChildren(List<SeriesBookLink> existingChildren, SeriesBookLink remote, List<SeriesBookLink> remoteChildren)
         {
             var existingChild = existingChildren.SingleOrDefault(x => x.BookId == remote.Book.Value.Id);
             var mergeChildren = new List<SeriesBookLink>();

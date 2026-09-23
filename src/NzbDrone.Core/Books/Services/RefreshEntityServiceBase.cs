@@ -95,7 +95,7 @@ namespace NzbDrone.Core.Books
 
         protected abstract List<TChild> GetRemoteChildren(TEntity local, TEntity remote);
         protected abstract List<TChild> GetLocalChildren(TEntity entity, List<TChild> remoteChildren);
-        protected abstract Tuple<TChild, List<TChild>> GetMatchingExistingChildren(List<TChild> existingChildren, TChild remote);
+        protected abstract Tuple<TChild, List<TChild>> GetMatchingExistingChildren(List<TChild> existingChildren, TChild remote, List<TChild> remoteChildren);
 
         protected abstract void PrepareNewChild(TChild child, TEntity entity);
         protected abstract void PrepareExistingChild(TChild local, TChild remote, TEntity entity);
@@ -236,7 +236,7 @@ namespace NzbDrone.Core.Books
             foreach (var remoteChild in remoteChildren)
             {
                 // Check for child in existing children, if not set properties and add to new list
-                var tuple = GetMatchingExistingChildren(localChildren, remoteChild);
+                var tuple = GetMatchingExistingChildren(localChildren, remoteChild, remoteChildren);
                 var existingChild = tuple.Item1;
                 var mergedChildren = tuple.Item2;
 

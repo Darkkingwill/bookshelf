@@ -243,7 +243,7 @@ namespace NzbDrone.Core.Books
                                                      remoteChildren.Select(x => x.ForeignBookId).ToList());
         }
 
-        protected override Tuple<Book, List<Book>> GetMatchingExistingChildren(List<Book> existingChildren, Book remote)
+        protected override Tuple<Book, List<Book>> GetMatchingExistingChildren(List<Book> existingChildren, Book remote, List<Book> remoteChildren)
         {
             var existingChild = existingChildren.SingleOrDefault(x => x.ForeignBookId == remote.ForeignBookId);
 

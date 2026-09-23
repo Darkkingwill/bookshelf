@@ -160,6 +160,18 @@ namespace NzbDrone.Core.Books
             // The authorMetadata entry will be in the db but make sure a corresponding author is too
             // so that the book doesn't just disappear.
 
+            // GetSkyhookData pins a separately-fetched book to the local author's metadata id, so the
+            // book stays where it is even when the source credits someone else (typically a mis-matched
+            // book, e.g. a Polish poetry collection filed under James Patterson). Nothing is being
+            // re-parented then, and adding the credited author only produced an author nothing points
+            // at - carrying the local author's metadata id, too. Every refresh re-added one of these, so
+            // a library accumulated hundreds of empty authors.
+            if (remote.AuthorMetadata.Value.Id > 0 && remote.AuthorMetadata.Value.Id == local.AuthorMetadataId)
+            {
+                _logger.Debug($"Book {local} is credited to {remote.AuthorMetadata.Value.Name} upstream but stays with its current author; not adding a new author");
+                return;
+            }
+
             // TODO filter by metadata id before hitting database
             _logger.Trace($"Ensuring parent author exists [{remote.AuthorMetadata.Value.ForeignAuthorId}]");
 
@@ -281,7 +293,7 @@ namespace NzbDrone.Core.Books
             return _editionService.GetEditionsForRefresh(entity.Id, remoteChildren.Select(x => x.ForeignEditionId).ToList());
         }
 
-        protected override Tuple<Edition, List<Edition>> GetMatchingExistingChildren(List<Edition> existingChildren, Edition remote)
+        protected override Tuple<Edition, List<Edition>> GetMatchingExistingChildren(List<Edition> existingChildren, Edition remote, List<Edition> remoteChildren)
         {
             var existingChild = existingChildren.SingleOrDefault(x => x.ForeignEditionId == remote.ForeignEditionId);
 
@@ -307,7 +319,17 @@ namespace NzbDrone.Core.Books
             {
                 var candidate = existingChildren[0];
 
-                if (candidate.Monitored || _mediaFileService.GetFilesByEdition(candidate.Id).Any())
+                // Only when the local edition's own id has actually disappeared from the remote list,
+                // which is the source-switch case this is for. If the remote list still carries it, it
+                // will match by id on its own turn; claiming it here for some other remote edition would
+                // relabel it (seen live: a file-bearing Ukrainian edition relabelled as the English
+                // Kindle edition) and then queue its real id for insert as new, which the unique index
+                // on ForeignEditionId rejects - so the refresh failed and English editions never arrived.
+                var candidateStillRemote = remoteChildren != null &&
+                                           remoteChildren.Any(x => x.ForeignEditionId == candidate.ForeignEditionId);
+
+                if (!candidateStillRemote &&
+                    (candidate.Monitored || _mediaFileService.GetFilesByEdition(candidate.Id).Any()))
                 {
                     existingChild = candidate;
 
