@@ -9,6 +9,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.MediaFiles.BookImport.Aggregation;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Profiles.Metadata;
 
 namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 {
@@ -23,18 +24,21 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
         private readonly IMetadataTagService _metadataTagService;
         private readonly IAugmentingService _augmentingService;
         private readonly ICandidateService _candidateService;
+        private readonly IMetadataProfileRepository _metadataProfileRepository;
         private readonly Logger _logger;
 
         public IdentificationService(ITrackGroupingService trackGroupingService,
                                      IMetadataTagService metadataTagService,
                                      IAugmentingService augmentingService,
                                      ICandidateService candidateService,
+                                     IMetadataProfileRepository metadataProfileRepository,
                                      Logger logger)
         {
             _trackGroupingService = trackGroupingService;
             _metadataTagService = metadataTagService;
             _augmentingService = augmentingService;
             _candidateService = candidateService;
+            _metadataProfileRepository = metadataProfileRepository;
             _logger = logger;
         }
 
@@ -78,6 +82,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             _logger.Debug("Starting book identification");
 
             var releases = GetLocalBookReleases(localTracks, config.SingleRelease);
+            var languages = new EditionLanguagePreference(_metadataProfileRepository.All());
 
             var i = 0;
             foreach (var localRelease in releases)
@@ -88,7 +93,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
                 try
                 {
-                    IdentifyRelease(localRelease, idOverrides, config);
+                    IdentifyRelease(localRelease, idOverrides, config, languages);
                 }
                 catch (Exception e)
                 {
@@ -124,7 +129,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             return localTracks;
         }
 
-        private void IdentifyRelease(LocalEdition localBookRelease, IdentificationOverrides idOverrides, ImportDecisionMakerConfig config)
+        private void IdentifyRelease(LocalEdition localBookRelease, IdentificationOverrides idOverrides, ImportDecisionMakerConfig config, EditionLanguagePreference languages)
         {
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var usedRemote = false;
@@ -163,7 +168,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
                 usedRemote = true;
             }
 
-            GetBestRelease(localBookRelease, candidateReleases, allLocalTracks, out var seenCandidate);
+            GetBestRelease(localBookRelease, candidateReleases, allLocalTracks, languages, out var seenCandidate);
 
             if (!seenCandidate)
             {
@@ -191,7 +196,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
                     candidateReleases = candidateReleases.Where(x => x.Edition.Book.Value.Id > 0);
                 }
 
-                GetBestRelease(localBookRelease, candidateReleases, allLocalTracks, out _);
+                GetBestRelease(localBookRelease, candidateReleases, allLocalTracks, languages, out _);
             }
 
             _logger.Debug($"Best release found in {watch.ElapsedMilliseconds}ms");
@@ -201,7 +206,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             _logger.Debug($"IdentifyRelease done in {watch.ElapsedMilliseconds}ms");
         }
 
-        private void GetBestRelease(LocalEdition localBookRelease, IEnumerable<CandidateEdition> candidateReleases, List<LocalBook> extraTracksOnDisk, out bool seenCandidate)
+        private void GetBestRelease(LocalEdition localBookRelease, IEnumerable<CandidateEdition> candidateReleases, List<LocalBook> extraTracksOnDisk, EditionLanguagePreference languages, out bool seenCandidate)
         {
             var watch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -223,7 +228,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
                 var extraTracks = extraTracksOnDisk.Where(x => extraTrackPaths.Contains(x.Path)).ToList();
                 var allLocalTracks = localBookRelease.LocalBooks.Concat(extraTracks).DistinctBy(x => x.Path).ToList();
 
-                var distance = DistanceCalculator.BookDistance(allLocalTracks, release);
+                var distance = DistanceCalculator.BookDistance(allLocalTracks, release, languages.For(release));
                 var currDistance = distance.NormalizedDistance();
 
                 rwatch.Stop();

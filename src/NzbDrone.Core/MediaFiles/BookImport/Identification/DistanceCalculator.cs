@@ -71,7 +71,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             return variants.Where(x => x.IsNotNullOrWhiteSpace()).Distinct().ToList();
         }
 
-        public static Distance BookDistance(List<LocalBook> localTracks, Edition edition)
+        public static Distance BookDistance(List<LocalBook> localTracks, Edition edition, ICollection<string> preferredLanguages = null)
         {
             var dist = new Distance();
 
@@ -170,6 +170,14 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             {
                 dist.AddBool("language", localLanguage != editionLanguage);
                 Logger.Trace($"language: {localLanguage} vs {editionLanguage}; {dist.NormalizedDistance()}");
+            }
+            else if (localLanguage.IsNullOrWhiteSpace() && editionLanguage.IsNotNullOrWhiteSpace() && preferredLanguages != null && preferredLanguages.Any())
+            {
+                // Audiobooks almost never carry a language tag, which left a translated edition free to win on
+                // title or year alone. Once a file is attached, the metadata profile's language filter exempts
+                // that edition for good, so steer the choice toward the languages the profile allows instead.
+                dist.AddBool("language", !preferredLanguages.Contains(editionLanguage));
+                Logger.Trace($"language: untagged vs {editionLanguage} (allowed: {preferredLanguages.ConcatToString()}); {dist.NormalizedDistance()}");
             }
 
             // Publisher - only if set for both the local book and remote edition
