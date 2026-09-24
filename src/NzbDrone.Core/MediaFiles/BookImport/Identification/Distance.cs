@@ -36,6 +36,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             { "track_index", 1.0 },
             { "track_length", 2.0 },
             { "recording_id", 10.0 },
+            { "folder_title", 3.0 },
         };
 
         private Dictionary<string, List<double>> _penalties;

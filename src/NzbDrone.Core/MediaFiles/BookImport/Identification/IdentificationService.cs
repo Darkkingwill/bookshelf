@@ -20,6 +20,13 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
     public class IdentificationService : IIdentificationService
     {
+        // A tag-based match this close is trusted and never second-guessed by the folder name.
+        private const double FolderTitleMinDistance = 0.05;
+
+        // The distance a folder-title match is given. It has to be an honest, low number because
+        // CloseBookMatchSpecification rejects anything above 0.50 further down the line.
+        private const double FolderTitleMatchDistance = 0.10;
+
         private readonly ITrackGroupingService _trackGroupingService;
         private readonly IMetadataTagService _metadataTagService;
         private readonly IAugmentingService _augmentingService;
@@ -172,6 +179,13 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
             if (!seenCandidate)
             {
+                // nothing from the tags - the folder name may still say what this is
+                if (TryFolderTitleMatch(localBookRelease, idOverrides, config, languages, allLocalTracks))
+                {
+                    localBookRelease.PopulateMatch(config.KeepAllEditions);
+                    return;
+                }
+
                 // can't find any candidates even after using remote search
                 // populate the overrides and return
                 foreach (var localTrack in localBookRelease.LocalBooks)
@@ -201,9 +215,68 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
             _logger.Debug($"Best release found in {watch.ElapsedMilliseconds}ms");
 
+            // weak or missing tag match: let an exact folder-title match take over
+            TryFolderTitleMatch(localBookRelease, idOverrides, config, languages, allLocalTracks);
+
             localBookRelease.PopulateMatch(config.KeepAllEditions);
 
             _logger.Debug($"IdentifyRelease done in {watch.ElapsedMilliseconds}ms");
+        }
+
+        // Falls back to the name of the book's folder when the tags gave no match, or only a weak or different
+        // one. Only an exact, unique title match qualifies (see CandidateService.GetDbCandidatesFromFolder), so it
+        // is safe to let it replace a poor tag match. A forced book or edition is never overridden.
+        private bool TryFolderTitleMatch(LocalEdition localBookRelease, IdentificationOverrides idOverrides, ImportDecisionMakerConfig config, EditionLanguagePreference languages, List<LocalBook> allLocalTracks)
+        {
+            if (idOverrides?.Edition != null || idOverrides?.Book != null)
+            {
+                return false;
+            }
+
+            var current = localBookRelease.Edition;
+
+            if (current != null && localBookRelease.Distance.NormalizedDistance() <= FolderTitleMinDistance)
+            {
+                return false;
+            }
+
+            var candidates = _candidateService.GetDbCandidatesFromFolder(localBookRelease, config.IncludeExisting);
+
+            if (candidates == null || !candidates.Any())
+            {
+                return false;
+            }
+
+            if (current != null && candidates.Any(x => x.Edition.BookId == current.BookId))
+            {
+                // already on that book
+                return false;
+            }
+
+            var previousDistance = localBookRelease.Distance;
+
+            // pick the closest edition of the folder-title book
+            localBookRelease.Edition = null;
+            GetBestRelease(localBookRelease, candidates, allLocalTracks, languages, out _);
+
+            if (localBookRelease.Edition == null)
+            {
+                // every edition scored as a complete mismatch; the folder title still decides
+                localBookRelease.Edition = candidates.First().Edition;
+                localBookRelease.ExistingTracks = new List<LocalBook>();
+            }
+
+            var distance = new Distance();
+            distance.Add("folder_title", FolderTitleMatchDistance);
+            localBookRelease.Distance = distance;
+
+            _logger.Debug("Matched {0} to {1} by its folder name (was {2}, distance {3})",
+                          localBookRelease,
+                          localBookRelease.Edition,
+                          current?.ToString() ?? "no match",
+                          previousDistance.NormalizedDistance());
+
+            return true;
         }
 
         private void GetBestRelease(LocalEdition localBookRelease, IEnumerable<CandidateEdition> candidateReleases, List<LocalBook> extraTracksOnDisk, EditionLanguagePreference languages, out bool seenCandidate)

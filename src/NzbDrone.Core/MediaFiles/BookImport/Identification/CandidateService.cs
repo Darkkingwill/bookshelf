@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
@@ -13,6 +14,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
     {
         List<CandidateEdition> GetDbCandidatesFromTags(LocalEdition localEdition, IdentificationOverrides idOverrides, bool includeExisting);
         IEnumerable<CandidateEdition> GetRemoteCandidates(LocalEdition localEdition, IdentificationOverrides idOverrides);
+        List<CandidateEdition> GetDbCandidatesFromFolder(LocalEdition localEdition, bool includeExisting);
     }
 
     public class CandidateService : ICandidateService
@@ -109,6 +111,84 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             _logger.Debug($"Getting {candidateReleases.Count} candidates from tags for {localEdition.LocalBooks.Count} tracks took {watch.ElapsedMilliseconds}ms");
 
             return candidateReleases;
+        }
+
+        // Candidate from the book's folder name, for when the tags are missing, noisy or point at the wrong book.
+        // Deliberately narrow: the folder title must equal one book title exactly (see FolderTitleMatcher), the
+        // author must be named exactly by the tags or by a folder above the book, and exactly one book may
+        // qualify. Anything looser is left to the normal tag-based matching.
+        public List<CandidateEdition> GetDbCandidatesFromFolder(LocalEdition localEdition, bool includeExisting)
+        {
+            var noCandidates = new List<CandidateEdition>();
+
+            // the book folder is the one holding most of the files
+            var filePath = localEdition.LocalBooks
+                .Select(x => x.Path)
+                .Where(x => x.IsNotNullOrWhiteSpace())
+                .GroupBy(x => Path.GetDirectoryName(x) ?? string.Empty)
+                .OrderByDescending(x => x.Count())
+                .Select(x => x.First())
+                .FirstOrDefault();
+
+            var folderTitle = FolderTitleMatcher.GetFolderTitle(filePath);
+
+            if (folderTitle.IsNullOrWhiteSpace())
+            {
+                return noCandidates;
+            }
+
+            var authors = new List<Author>();
+
+            void AddAuthorsNamed(string name)
+            {
+                if (name.IsNullOrWhiteSpace())
+                {
+                    return;
+                }
+
+                var wanted = FolderTitleMatcher.Clean(name);
+
+                authors.AddRange(_authorService.GetCandidates(name)
+                    .Where(x => FolderTitleMatcher.Clean(x.Metadata.Value.Name) == wanted));
+            }
+
+            // authors named by the tags
+            var authorTags = localEdition.LocalBooks.MostCommon(x => x.FileTrackInfo.Authors) ?? new List<string>();
+            foreach (var variant in DistanceCalculator.GetAuthorVariants(authorTags.Where(x => x.IsNotNullOrWhiteSpace()).ToList()))
+            {
+                AddAuthorsNamed(variant);
+            }
+
+            // authors named by the folders above the book folder (Author/Series/Book)
+            var directory = Path.GetDirectoryName(filePath);
+            for (var i = 0; i < 3 && directory.IsNotNullOrWhiteSpace(); i++)
+            {
+                directory = Path.GetDirectoryName(directory);
+
+                if (directory.IsNullOrWhiteSpace())
+                {
+                    break;
+                }
+
+                AddAuthorsNamed(Path.GetFileName(directory));
+            }
+
+            var books = authors
+                .DistinctBy(x => x.AuthorMetadataId)
+                .SelectMany(x => _bookService.GetBooksByAuthorMetadataId(x.AuthorMetadataId))
+                .Where(x => FolderTitleMatcher.MatchesTitle(x.Title, folderTitle))
+                .DistinctBy(x => x.Id)
+                .ToList();
+
+            if (books.Count != 1)
+            {
+                _logger.Trace("Folder title '{0}' matches {1} books, not using it as a candidate", folderTitle, books.Count);
+                return noCandidates;
+            }
+
+            _logger.Debug("Folder title '{0}' matches book {1}", folderTitle, books[0]);
+
+            return GetDbCandidatesByBook(books[0], includeExisting);
         }
 
         private List<CandidateEdition> GetDbCandidatesByEdition(List<Edition> editions, bool includeExisting)
