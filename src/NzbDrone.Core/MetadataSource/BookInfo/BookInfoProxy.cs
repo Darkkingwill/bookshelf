@@ -27,6 +27,9 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
 {
     public class BookInfoProxy : IProvideAuthorInfo, IProvideBookInfo, ISearchForNewBook, ISearchForNewAuthor, ISearchForNewEntity
     {
+        // Opt-in, per-author variant of the "goodreads" pin - see GetGoodreadsProxyAuthorInfo.
+        private const string GoodreadsProxySource = "goodreads-proxy";
+
         private static readonly JsonSerializerOptions SerializerSettings = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = false,
@@ -376,8 +379,6 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
         // edition in ("eng, null"). The proxy's list is deduplicated and has real languages.
         // The trade-off is freshness: the proxy may serve an author for days, where the direct feed
         // is at most a day old.
-        private const string GoodreadsProxySource = "goodreads-proxy";
-
         private static bool IsGoodreadsProxySource(string metadataSource)
         {
             return metadataSource.IsNotNullOrWhiteSpace() &&
