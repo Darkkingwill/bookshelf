@@ -160,9 +160,15 @@ namespace NzbDrone.Core.Test.MusicTests
         [Test]
         public void should_call_new_book_monitor_service_when_adding_book()
         {
+            // A distinct title matters: RefreshAuthorService matches a remote book that has no id match
+            // to an existing one by clean title (so a book re-id'd by a metadata source change is updated
+            // in place, not duplicated). With the builder's shared default title this book would be
+            // treated as an existing one and never "added".
             var newBook = Builder<Book>.CreateNew()
                 .With(x => x.Id = 0)
                 .With(x => x.ForeignBookId = "3")
+                .With(x => x.Title = "A Brand New Book")
+                .With(x => x.CleanTitle = "abrandnewbook")
                 .Build();
             _remoteBooks.Add(newBook);
 
