@@ -170,7 +170,10 @@ namespace NzbDrone.Core.Profiles.Metadata
                 book.Editions = FilterEditions(book.Editions.Value, localEditions, localFiles, profile);
             }
 
-            FilterByPredicate(hash, x => x.ForeignBookId, localHash, profile, (x, p) => x.Editions.Value.Any(e => e.PageCount > p.MinPages) || x.Editions.Value.All(e => e.PageCount == 0), "minimum page count not met");
+            // With no minimum, a work with no page data at all passes (nothing to judge it by). Once a minimum is
+            // set, missing page data no longer counts as passing: works with no page count are mostly stubs
+            // (magazine issues, single stories, bare listings), and letting them through defeats the minimum.
+            FilterByPredicate(hash, x => x.ForeignBookId, localHash, profile, (x, p) => x.Editions.Value.Any(e => e.PageCount > p.MinPages) || (p.MinPages == 0 && x.Editions.Value.All(e => e.PageCount == 0)), "minimum page count not met");
             FilterByPredicate(hash, x => x.ForeignBookId, localHash, profile, (x, p) => x.Editions.Value.Any(), "all editions filtered out");
 
             return hash.ToList();

@@ -357,5 +357,73 @@ namespace NzbDrone.Core.Test.Profiles.Metadata
             Assert.NotNull(result);
             Assert.IsInstanceOf<List<Book>>(result);
         }
+
+        private List<string> FilterTitlesByPages(int minPages, params int[] pageCounts)
+        {
+            var profile = Builder<MetadataProfile>.CreateNew()
+                .With(p => p.Id = 1)
+                .With(p => p.MinPopularity = 0)
+                .With(p => p.MinPages = minPages)
+                .With(p => p.SkipMissingDate = false)
+                .With(p => p.SkipMissingIsbn = false)
+                .With(p => p.SkipPartsAndSets = false)
+                .With(p => p.SkipSeriesSecondary = false)
+                .With(p => p.AllowedLanguages = string.Empty)
+                .With(p => p.Ignored = new List<string>())
+                .Build();
+
+            var books = new List<Book>();
+            for (var i = 0; i < pageCounts.Length; i++)
+            {
+                var pages = pageCounts[i];
+                var edition = Builder<Edition>.CreateNew()
+                    .With(e => e.ForeignEditionId = "e" + i)
+                    .With(e => e.PageCount = pages)
+                    .Build();
+
+                books.Add(Builder<Book>.CreateNew()
+                    .With(b => b.ForeignBookId = "b" + i)
+                    .With(b => b.Title = "Pages " + pages + " #" + i)
+                    .With(b => b.Ratings = new Ratings { Value = 4.0m, Votes = 50 })
+                    .With(b => b.ReleaseDate = DateTime.UtcNow.AddDays(-1))
+                    .With(b => b.Editions = new LazyLoaded<List<Edition>>(new List<Edition> { edition }))
+                    .Build());
+            }
+
+            var author = Builder<Author>.CreateNew()
+                .With(a => a.ForeignAuthorId = "204214")
+                .With(a => a.MetadataProfileId = 1)
+                .With(a => a.Metadata = Builder<AuthorMetadata>.CreateNew()
+                    .With(m => m.ForeignAuthorId = "204214")
+                    .Build())
+                .With(a => a.Series = new LazyLoaded<List<Series>>(new List<Series>()))
+                .With(a => a.Books = new LazyLoaded<List<Book>>(books))
+                .Build();
+
+            Mocker.GetMock<IMetadataProfileRepository>().Setup(s => s.Get(1)).Returns(profile);
+            Mocker.GetMock<IAuthorService>().Setup(s => s.FindById(It.IsAny<string>())).Returns((Author)null);
+            Mocker.GetMock<IBookService>().Setup(s => s.GetBooksByAuthorMetadataId(It.IsAny<int>())).Returns(new List<Book>());
+            Mocker.GetMock<IEditionService>().Setup(s => s.GetEditionsByAuthor(It.IsAny<int>())).Returns(new List<Edition>());
+            Mocker.GetMock<IMediaFileService>().Setup(s => s.GetFilesByAuthor(It.IsAny<int>())).Returns(new List<BookFile>());
+
+            return Subject.FilterBooks(author, 1).Select(b => b.Title).ToList();
+        }
+
+        [Test]
+        public void FilterBooks_should_keep_works_with_no_page_data_when_there_is_no_minimum()
+        {
+            var kept = FilterTitlesByPages(0, 0, 300);
+
+            Assert.AreEqual(2, kept.Count);
+        }
+
+        [Test]
+        public void FilterBooks_should_drop_works_with_no_page_data_when_a_minimum_is_set()
+        {
+            var kept = FilterTitlesByPages(80, 0, 300, 40);
+
+            Assert.AreEqual(1, kept.Count);
+            StringAssert.Contains("300", kept[0]);
+        }
     }
 }
