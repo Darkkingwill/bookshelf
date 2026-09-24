@@ -170,6 +170,20 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
 
         private Tuple<string, Book, List<AuthorMetadata>> GetBookInfoFromSource(string metadataSource, string foreignBookId)
         {
+            if (IsGoodreadsProxySource(metadataSource))
+            {
+                // Same Goodreads id space and the same proxy-first book lookup as "goodreads"; only the
+                // tag it leaves on the author metadata differs, so the pin survives a refresh.
+                var tuple = GetGoodreadsBookInfo(foreignBookId);
+
+                foreach (var authorMetadata in tuple.Item3)
+                {
+                    authorMetadata.MetadataSource = GoodreadsProxySource;
+                }
+
+                return tuple;
+            }
+
             if (metadataSource.Equals("goodreads", StringComparison.OrdinalIgnoreCase))
             {
                 return GetGoodreadsBookInfo(foreignBookId);
@@ -354,8 +368,53 @@ namespace NzbDrone.Core.MetadataSource.BookInfo
             return Tuple.Create(authorForeignId, book, new List<AuthorMetadata> { authorMetadata });
         }
 
+        // "goodreads-proxy" is an opt-in, per-author variant of the "goodreads" pin. It keeps the same
+        // Goodreads id space (so nothing about identity changes) but fetches the author's book list
+        // from the local metadata proxy first instead of straight from Goodreads. The direct
+        // author/list feed carries no language for any edition, which makes a language-restricted
+        // metadata profile either drop every new book (only "eng" allowed) or let every foreign
+        // edition in ("eng, null"). The proxy's list is deduplicated and has real languages.
+        // The trade-off is freshness: the proxy may serve an author for days, where the direct feed
+        // is at most a day old.
+        private const string GoodreadsProxySource = "goodreads-proxy";
+
+        private static bool IsGoodreadsProxySource(string metadataSource)
+        {
+            return metadataSource.IsNotNullOrWhiteSpace() &&
+                   metadataSource.Equals(GoodreadsProxySource, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private Author GetGoodreadsProxyAuthorInfo(string foreignAuthorId)
+        {
+            Author author;
+
+            try
+            {
+                author = PollAuthor(foreignAuthorId);
+            }
+            catch (Exception ex)
+            {
+                // Any miss falls back, including a clean "not found". Unlike the book path (where a
+                // work id and an edition id are different numbering spaces, so a retry can return a
+                // wrong book), an author id is the same in the proxy and on Goodreads, and a refresh
+                // treats "not found" as the author being gone - an author with no files is deleted.
+                // So only Goodreads' own answer to the same id is allowed to say that.
+                _logger.Warn(ex, "Local metadata proxy could not supply author {0}, falling back to Goodreads directly", foreignAuthorId);
+                author = GetAuthorInfoFromSource("goodreads", foreignAuthorId);
+            }
+
+            // Whichever path resolved it, keep the pin so later refreshes route back here.
+            author.Metadata.Value.MetadataSource = GoodreadsProxySource;
+            return author;
+        }
+
         private Author GetAuthorInfoFromSource(string metadataSource, string foreignAuthorId)
         {
+            if (IsGoodreadsProxySource(metadataSource))
+            {
+                return GetGoodreadsProxyAuthorInfo(foreignAuthorId);
+            }
+
             if (metadataSource.Equals("goodreads", StringComparison.OrdinalIgnoreCase))
             {
                 if (!long.TryParse(foreignAuthorId, out var goodreadsAuthorId))
