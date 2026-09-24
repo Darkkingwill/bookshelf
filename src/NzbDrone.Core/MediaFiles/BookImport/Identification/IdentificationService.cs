@@ -20,9 +20,6 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
     public class IdentificationService : IIdentificationService
     {
-        // A tag-based match this close is trusted and never second-guessed by the folder name.
-        private const double FolderTitleMinDistance = 0.05;
-
         // The distance a folder-title match is given. It has to be an honest, low number because
         // CloseBookMatchSpecification rejects anything above 0.50 further down the line.
         private const double FolderTitleMatchDistance = 0.10;
@@ -215,7 +212,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
             _logger.Debug($"Best release found in {watch.ElapsedMilliseconds}ms");
 
-            // weak or missing tag match: let an exact folder-title match take over
+            // an exact folder-title match to a different book takes over from the tags
             TryFolderTitleMatch(localBookRelease, idOverrides, config, languages, allLocalTracks);
 
             localBookRelease.PopulateMatch(config.KeepAllEditions);
@@ -223,9 +220,9 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             _logger.Debug($"IdentifyRelease done in {watch.ElapsedMilliseconds}ms");
         }
 
-        // Falls back to the name of the book's folder when the tags gave no match, or only a weak or different
-        // one. Only an exact, unique title match qualifies (see CandidateService.GetDbCandidatesFromFolder), so it
-        // is safe to let it replace a poor tag match. A forced book or edition is never overridden.
+        // Falls back to the name of the book's folder when the tags gave no match, or a match to a different book.
+        // Only an exact, unique title match qualifies (see CandidateService.GetDbCandidatesFromFolder), so it is
+        // safe to let it replace a tag match. A forced book or edition is never overridden.
         private bool TryFolderTitleMatch(LocalEdition localBookRelease, IdentificationOverrides idOverrides, ImportDecisionMakerConfig config, EditionLanguagePreference languages, List<LocalBook> allLocalTracks)
         {
             if (idOverrides?.Edition != null || idOverrides?.Book != null)
@@ -235,11 +232,10 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
             var current = localBookRelease.Edition;
 
-            if (current != null && localBookRelease.Distance.NormalizedDistance() <= FolderTitleMinDistance)
-            {
-                return false;
-            }
-
+            // No distance cut-off on the tag match: a candidate that already holds other files is scored partly by
+            // those files' tags, so it can look like a near-perfect match to a file that belongs to a different book
+            // in the same series (seen live: "Currency" scoring 0.03 against "The System of the World"). An exact,
+            // unique folder-title match to a *different* book is stronger evidence than that.
             var candidates = _candidateService.GetDbCandidatesFromFolder(localBookRelease, config.IncludeExisting);
 
             if (candidates == null || !candidates.Any())

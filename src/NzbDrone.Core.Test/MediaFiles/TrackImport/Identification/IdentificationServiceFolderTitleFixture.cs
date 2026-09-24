@@ -147,16 +147,33 @@ namespace NzbDrone.Core.Test.MediaFiles.BookImport.Identification
         }
 
         [Test]
-        public void should_keep_a_close_tag_match_and_not_even_look_at_the_folder()
+        public void should_keep_a_close_tag_match_when_the_folder_names_the_same_book()
         {
-            GivenTagCandidate(GivenEdition(2, "Currency"));
+            var edition = GivenEdition(2, "Currency");
+            GivenTagCandidate(edition);
+            GivenFolderCandidate(edition);
 
             var result = Subject.Identify(GivenTracks("Currency"), new IdentificationOverrides(), GivenScanConfig());
 
-            result[0].Edition.Title.Should().Be("Currency");
+            result[0].Edition.BookId.Should().Be(2);
 
-            Mocker.GetMock<ICandidateService>()
-                .Verify(x => x.GetDbCandidatesFromFolder(It.IsAny<LocalEdition>(), It.IsAny<bool>()), Times.Never());
+            // the tag match stays as it was, with its real distance rather than the folder-title one
+            result[0].Distance.Reasons.Should().NotContain("folder title");
+        }
+
+        [Test]
+        public void should_let_the_folder_title_replace_even_a_near_perfect_tag_match_to_a_different_book()
+        {
+            // A candidate that already holds other files is scored partly by those files' tags, so it can look like
+            // an almost perfect match to a file belonging to another book of the same series. The tags here say
+            // "The System of the World" outright, yet the folder is named exactly after a different book.
+            GivenTagCandidate(GivenEdition(3, "The System of the World"));
+            GivenFolderCandidate(GivenEdition(2, "Currency"));
+
+            var result = Subject.Identify(GivenTracks("The System of the World"), new IdentificationOverrides(), GivenScanConfig());
+
+            result[0].Edition.BookId.Should().Be(2);
+            result[0].Distance.Reasons.Should().Contain("folder title");
         }
 
         [Test]
