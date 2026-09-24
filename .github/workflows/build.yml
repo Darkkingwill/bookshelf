@@ -122,15 +122,6 @@ jobs:
             type=raw,value=softcover-v${{ env.READARR_VERSION }}
             type=raw,value=softcover-v${{ env.READARR_VERSION }}.${{ github.run_number }}
 
-      - uses: docker/metadata-action@v5
-        id: hc_meta
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=hardcover
-            type=raw,value=hardcover-v${{ env.READARR_VERSION }}
-            type=raw,value=hardcover-v${{ env.READARR_VERSION }}.${{ github.run_number }}
-
       - uses: docker/login-action@v3
         if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
         with:
@@ -150,18 +141,3 @@ jobs:
             GIT_BRANCH=${{ env.BUILD_SOURCEBRANCHNAME }}
             COMMIT_HASH=${{ github.event.pull_request.head.sha || github.sha }}
             BUILD_DATE=${{ env.DATE }}
-
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          platforms: "linux/amd64,linux/arm64"
-          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
-          tags: ${{ steps.hc_meta.outputs.tags }}
-          labels: ${{ steps.hc_meta.outputs.labels }}
-          build-args: |
-            GIT_BRANCH=${{ env.BUILD_SOURCEBRANCHNAME }}
-            COMMIT_HASH=${{ github.event.pull_request.head.sha || github.sha }}
-            BUILD_DATE=${{ env.DATE }}
-            METADATA_URL=https://hardcover.bookinfo.pro
-            HARDCOVER=true
