@@ -20,16 +20,14 @@ import { icons, inputTypes, kinds, tooltipPositions } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import styles from './EditAuthorModalContent.css';
 
-// Audible is deliberately excluded here - its GetAuthorInfo always returns null (no
-// author-level endpoint without auth), so pinning an author to it would just make every
-// future refresh fail. It still works fine as a book-level lookup source (ASIN search/add).
+// Only the sources an author can actually be pinned to today. Google Books, Open Library and
+// rreading-glasses each use their own id format, which made switching to them easy to get wrong,
+// and no author uses them. An author already on a source missing from this list would show a
+// wrong value here, so add a source back before pinning anyone to it.
 const metadataSourceOptions = [
-  { key: 'hardcover', value: 'Hardcover' },
-  { key: 'goodreads', value: 'Goodreads' },
   { key: 'goodreads-proxy', value: 'Goodreads (via proxy, with languages)' },
-  { key: 'googlebooks', value: 'Google Books' },
-  { key: 'openlibrary', value: 'Open Library' },
-  { key: 'rreadingglasses', value: 'rreading-glasses' }
+  { key: 'goodreads', value: 'Goodreads (direct, no languages)' },
+  { key: 'hardcover', value: 'Hardcover' }
 ];
 
 class EditAuthorModalContent extends Component {
