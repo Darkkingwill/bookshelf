@@ -199,7 +199,15 @@ namespace NzbDrone.Core.MediaCover
 
         public void EnsureBookCovers(Book book)
         {
-            foreach (var cover in book.Editions.Value.Single(x => x.Monitored).Images.Where(e => e.CoverType == MediaCoverTypes.Cover))
+            // A book can have no monitored edition (or several) after a refresh; one of those must not
+            // throw, because HandleAsync loops every book of the author and would skip the rest.
+            var edition = book.Editions.Value.FirstOrDefault(x => x.Monitored);
+            if (edition == null)
+            {
+                return;
+            }
+
+            foreach (var cover in edition.Images.Where(e => e.CoverType == MediaCoverTypes.Cover))
             {
                 if (cover.CoverType == MediaCoverTypes.Unknown)
                 {
