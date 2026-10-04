@@ -93,6 +93,13 @@ namespace NzbDrone.Core.Books
         {
             Author author;
 
+            // The direct Goodreads feed carries no edition language, so a new author on it loses every
+            // book to a language-restricted metadata profile. Same ids, so pin new authors to the proxy.
+            if ("goodreads".Equals(newAuthor.Metadata.Value.MetadataSource, StringComparison.OrdinalIgnoreCase))
+            {
+                newAuthor.Metadata.Value.MetadataSource = "goodreads-proxy";
+            }
+
             try
             {
                 author = _authorInfo.GetAuthorInfo(newAuthor.Metadata.Value.ForeignAuthorId, false, newAuthor.Metadata.Value.MetadataSource);
