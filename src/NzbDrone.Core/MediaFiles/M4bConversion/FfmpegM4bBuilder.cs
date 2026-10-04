@@ -142,7 +142,9 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
 
         private static string BuildArgs(List<string> inputFiles, string chaptersPath, string coverImagePath, string title, string artist, string album, string outputPath)
         {
-            var args = new StringBuilder("-y ");
+            // ffmpeg writes its banner and a progress line every half second to stderr, which the process
+            // provider logs at Error level. Keep stderr to genuine errors so the log stays readable.
+            var args = new StringBuilder("-y -hide_banner -nostats -loglevel error ");
 
             foreach (var file in inputFiles)
             {
