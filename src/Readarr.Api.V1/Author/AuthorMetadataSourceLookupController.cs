@@ -56,6 +56,7 @@ namespace Readarr.Api.V1.Author
                     return SearchLegacy(term);
 
                 case "goodreads":
+                case "goodreads-proxy":
                     return SearchGoodreads(term);
 
                 case "openlibrary":

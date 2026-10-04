@@ -26,6 +26,7 @@ import styles from './EditAuthorModalContent.css';
 const metadataSourceOptions = [
   { key: 'hardcover', value: 'Hardcover' },
   { key: 'goodreads', value: 'Goodreads' },
+  { key: 'goodreads-proxy', value: 'Goodreads (via proxy, with languages)' },
   { key: 'googlebooks', value: 'Google Books' },
   { key: 'openlibrary', value: 'Open Library' },
   { key: 'rreadingglasses', value: 'rreading-glasses' }
