@@ -135,6 +135,7 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
                     DateAdded = DateTime.UtcNow,
                     Quality = new QualityModel(Quality.M4B),
                     EditionId = edition.Id,
+                    Edition = edition,
                     Part = 1
                 };
 
