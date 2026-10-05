@@ -209,6 +209,13 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("CopyUsingHardlinks", value); }
         }
 
+        public bool AutoConvertToM4b
+        {
+            get { return GetValueBoolean("AutoConvertToM4b", true); }
+
+            set { SetValue("AutoConvertToM4b", value); }
+        }
+
         public bool ImportExtraFiles
         {
             get { return GetValueBoolean("ImportExtraFiles", false); }

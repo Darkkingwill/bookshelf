@@ -53,6 +53,8 @@
   "ApplyTagsHelpTextReplace": "Replace: Replace the tags with the entered tags (enter no tags to clear all tags)",
   "AptUpdater": "Use apt to install the update",
   "AudioFileMetadata": "Write Metadata to Audio Files",
+  "AutoConvertToM4b": "Convert to M4B After Import",
+  "AutoConvertToM4bHelpText": "When a downloaded audiobook is imported as MP3 (or anything other than M4B), merge it into one chaptered M4B with the book's title, author, year, description and narrator tagged. The downloaded torrent is left alone, so it keeps seeding. Rescans of your existing library never trigger this.",
   "AuthBasic": "Basic (Browser Popup)",
   "AuthForm": "Forms (Login Page)",
   "Authentication": "Authentication",

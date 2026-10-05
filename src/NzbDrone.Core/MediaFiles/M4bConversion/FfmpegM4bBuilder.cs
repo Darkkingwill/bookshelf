@@ -14,7 +14,11 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
     {
         // inputFiles must already be in the order they should play/appear as chapters.
         // chapterTitles must be the same length as inputFiles. coverImagePath is optional.
-        void BuildM4b(List<string> inputFiles, List<string> chapterTitles, string title, string artist, string album, string coverImagePath, string outputPath);
+        void BuildM4b(List<string> inputFiles, List<string> chapterTitles, M4bTags tags, string coverImagePath, string outputPath);
+
+        // The tags ffprobe finds on a file (keys lower-cased), used to carry over what the uploader wrote,
+        // such as the narrator. Returns an empty dictionary when the file cannot be read.
+        Dictionary<string, string> ReadTags(string path);
     }
 
     // Everything ffmpeg/ffprobe-specific lives here so the orchestrating service (which owns
@@ -34,7 +38,7 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
             _logger = logger;
         }
 
-        public void BuildM4b(List<string> inputFiles, List<string> chapterTitles, string title, string artist, string album, string coverImagePath, string outputPath)
+        public void BuildM4b(List<string> inputFiles, List<string> chapterTitles, M4bTags tags, string coverImagePath, string outputPath)
         {
             if (inputFiles.Count != chapterTitles.Count)
             {
@@ -49,11 +53,11 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
             try
             {
                 var chaptersPath = Path.Combine(workDir, "chapters.txt");
-                File.WriteAllText(chaptersPath, BuildChapterMetadata(durationsMs, chapterTitles), new UTF8Encoding(false));
+                File.WriteAllText(chaptersPath, BuildMetadataFile(durationsMs, chapterTitles, tags), new UTF8Encoding(false));
 
                 var hasCover = coverImagePath.IsNotNullOrWhiteSpace() && File.Exists(coverImagePath);
 
-                var args = BuildArgs(inputFiles, chaptersPath, hasCover ? coverImagePath : null, title, artist, album, outputPath);
+                var args = BuildArgs(inputFiles, chaptersPath, hasCover ? coverImagePath : null, outputPath);
 
                 _logger.Debug("Running ffmpeg for M4B conversion");
 
@@ -79,6 +83,42 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
             }
         }
 
+        public Dictionary<string, string> ReadTags(string path)
+        {
+            var tags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var args = $"-v error -show_entries format_tags -of default=noprint_wrappers=1 \"{path}\"";
+                var output = _processProvider.StartAndCapture("ffprobe", args);
+
+                if (output.ExitCode != 0)
+                {
+                    return tags;
+                }
+
+                foreach (var line in output.Standard.Select(l => l.Content))
+                {
+                    const string prefix = "TAG:";
+                    var separator = line.IndexOf('=');
+
+                    if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || separator <= prefix.Length)
+                    {
+                        continue;
+                    }
+
+                    tags[line.Substring(prefix.Length, separator - prefix.Length).Trim().ToLowerInvariant()] = line.Substring(separator + 1).Trim();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Tags are only an enrichment; never fail a conversion because a source tag could not be read.
+                _logger.Debug(ex, "Could not read tags from {0}", path);
+            }
+
+            return tags;
+        }
+
         private double GetDurationMs(string path)
         {
             var args = $"-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{path}\"";
@@ -100,10 +140,22 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
             return seconds * 1000.0;
         }
 
-        private static string BuildChapterMetadata(List<double> durationsMs, List<string> chapterTitles)
+        // The global tags and the chapters go in one FFMETADATA1 file, which ffmpeg reads with -map_metadata.
+        // That keeps a long description (newlines, quotes, '=') out of the command line entirely.
+        internal static string BuildMetadataFile(List<double> durationsMs, List<string> chapterTitles, M4bTags tags)
         {
             var sb = new StringBuilder();
             sb.AppendLine(";FFMETADATA1");
+
+            AppendTag(sb, "title", tags?.Title);
+            AppendTag(sb, "artist", tags?.Artist);
+            AppendTag(sb, "album_artist", tags?.AlbumArtist);
+            AppendTag(sb, "album", tags?.Album);
+            AppendTag(sb, "date", tags?.Year?.ToString(CultureInfo.InvariantCulture));
+            AppendTag(sb, "composer", tags?.Narrator);
+            AppendTag(sb, "description", tags?.Description);
+            AppendTag(sb, "synopsis", tags?.Description);
+            AppendTag(sb, "genre", "Audiobook");
 
             double cursor = 0;
 
@@ -125,6 +177,14 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
             return sb.ToString();
         }
 
+        private static void AppendTag(StringBuilder sb, string key, string value)
+        {
+            if (value.IsNotNullOrWhiteSpace())
+            {
+                sb.AppendLine($"{key}={EscapeMetadata(value)}");
+            }
+        }
+
         // FFMETADATA1 requires '=', ';', '#', '\' and newlines within a value to be
         // backslash-escaped, or the file fails to parse (or worse, parses into the wrong
         // field) the moment a chapter title contains one of them - book/series titles
@@ -137,10 +197,11 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
                 .Replace("=", "\\=")
                 .Replace(";", "\\;")
                 .Replace("#", "\\#")
+                .Replace("\r", string.Empty)
                 .Replace("\n", "\\\n");
         }
 
-        private static string BuildArgs(List<string> inputFiles, string chaptersPath, string coverImagePath, string title, string artist, string album, string outputPath)
+        internal static string BuildArgs(List<string> inputFiles, string chaptersPath, string coverImagePath, string outputPath)
         {
             // ffmpeg writes its banner and a progress line every half second to stderr, which the process
             // provider logs at Error level. Keep stderr to genuine errors so the log stays readable.
@@ -173,21 +234,12 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
             }
 
             args.Append($"-map_metadata {chaptersInputIndex} ");
-            args.Append($"-metadata title=\"{EscapeArg(title)}\" ");
-            args.Append($"-metadata artist=\"{EscapeArg(artist)}\" ");
-            args.Append($"-metadata album=\"{EscapeArg(album)}\" ");
-            args.Append("-metadata genre=\"Audiobook\" ");
 
             args.Append("-c:a aac -b:a 128k -ar 44100 ");
             args.Append("-movflags +faststart ");
             args.Append($"\"{outputPath}\"");
 
             return args.ToString();
-        }
-
-        private static string EscapeArg(string value)
-        {
-            return (value ?? string.Empty).Replace("\"", "\\\"");
         }
     }
 }

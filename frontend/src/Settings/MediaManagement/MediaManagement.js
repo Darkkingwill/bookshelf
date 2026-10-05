@@ -199,6 +199,20 @@ class MediaManagement extends Component {
 
                       <FormGroup size={sizes.MEDIUM}>
                         <FormLabel>
+                          {translate('AutoConvertToM4b')}
+                        </FormLabel>
+
+                        <FormInputGroup
+                          type={inputTypes.CHECK}
+                          name="autoConvertToM4b"
+                          helpText={translate('AutoConvertToM4bHelpText')}
+                          onChange={onInputChange}
+                          {...settings.autoConvertToM4b}
+                        />
+                      </FormGroup>
+
+                      <FormGroup size={sizes.MEDIUM}>
+                        <FormLabel>
                           {translate('ImportExtraFiles')}
                         </FormLabel>
 

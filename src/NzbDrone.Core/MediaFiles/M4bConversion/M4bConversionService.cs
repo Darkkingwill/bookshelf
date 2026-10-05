@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text.RegularExpressions;
 using NLog;
 using NzbDrone.Common.Disk;
@@ -9,6 +10,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.Books;
 using NzbDrone.Core.Books.Commands;
+using NzbDrone.Core.History;
 using NzbDrone.Core.MediaCover;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Organizer;
@@ -19,6 +21,9 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
     public class M4bConversionService : IExecute<ConvertToM4bCommand>
     {
         private static readonly Regex LeadingTrackNumberRegex = new Regex(@"^[\d\s._-]+", RegexOptions.Compiled);
+        private static readonly Regex NarratorRegex = new Regex(@"narrated by\s+(?<narrator>[^\[\(]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex HtmlTagRegex = new Regex(@"<[^>]+>", RegexOptions.Compiled);
+        private static readonly Regex WhitespaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
 
         private readonly IBookService _bookService;
         private readonly IAuthorService _authorService;
@@ -28,6 +33,7 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
         private readonly IBuildFileNames _buildFileNames;
         private readonly IMapCoversToLocal _coverMapper;
         private readonly IFfmpegM4bBuilder _ffmpegBuilder;
+        private readonly IHistoryService _historyService;
         private readonly IDiskProvider _diskProvider;
         private readonly Logger _logger;
 
@@ -39,9 +45,11 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
                                      IBuildFileNames buildFileNames,
                                      IMapCoversToLocal coverMapper,
                                      IFfmpegM4bBuilder ffmpegBuilder,
+                                     IHistoryService historyService,
                                      IDiskProvider diskProvider,
                                      Logger logger)
         {
+            _historyService = historyService;
             _bookService = bookService;
             _authorService = authorService;
             _editionService = editionService;
@@ -105,9 +113,7 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
                 _ffmpegBuilder.BuildM4b(
                     orderedFiles.Select(f => f.Path).ToList(),
                     chapterTitles,
-                    edition.Title.IsNotNullOrWhiteSpace() ? edition.Title : book.Title,
-                    author.Metadata.Value.Name,
-                    edition.Title.IsNotNullOrWhiteSpace() ? edition.Title : book.Title,
+                    BuildTags(author, book, edition, orderedFiles),
                     coverPath,
                     tempOutputPath);
 
@@ -187,6 +193,90 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
 
             var fileName = _buildFileNames.BuildBookFileName(author, edition, placeholder);
             return _buildFileNames.BuildBookFilePath(author, edition, fileName, ".m4b");
+        }
+
+        // Title, artist and year come from the book the file is attached to. The narrator comes from the
+        // release the book was grabbed as ("narrated by X"), falling back to what the uploader tagged.
+        private M4bTags BuildTags(Author author, Book book, Edition edition, List<BookFile> orderedFiles)
+        {
+            var title = edition.Title.IsNotNullOrWhiteSpace() ? edition.Title : book.Title;
+            var authorName = author.Metadata.Value.Name;
+            var year = edition.ReleaseDate?.Year ?? book.ReleaseDate?.Year;
+
+            return new M4bTags
+            {
+                Title = title,
+                Album = title,
+                Artist = authorName,
+                AlbumArtist = authorName,
+                Year = year.HasValue && year.Value >= 1500 ? year : null,
+                Description = CleanDescription(edition.Overview),
+                Narrator = FindNarrator(book, authorName, orderedFiles)
+            };
+        }
+
+        private string FindNarrator(Book book, string authorName, List<BookFile> orderedFiles)
+        {
+            try
+            {
+                var grabbed = _historyService.GetByBook(book.Id, EntityHistoryEventType.Grabbed)
+                    .OrderByDescending(h => h.Date)
+                    .Select(h => ParseNarrator(h.SourceTitle))
+                    .FirstOrDefault(n => n.IsNotNullOrWhiteSpace());
+
+                if (grabbed.IsNotNullOrWhiteSpace())
+                {
+                    return grabbed;
+                }
+
+                var sourceTags = _ffmpegBuilder.ReadTags(orderedFiles.First().Path);
+
+                foreach (var key in new[] { "narrator", "composer" })
+                {
+                    if (sourceTags.TryGetValue(key, out var value) &&
+                        value.IsNotNullOrWhiteSpace() &&
+                        !value.Equals(authorName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return value;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // The narrator is an enrichment; a failed lookup must not stop the conversion.
+                _logger.Debug(ex, "Could not work out the narrator for '{0}'", book.Title);
+            }
+
+            return null;
+        }
+
+        // Release titles look like "Title by Author, narrated by Jane Doe [ENG / M4B]".
+        internal static string ParseNarrator(string releaseTitle)
+        {
+            if (releaseTitle.IsNullOrWhiteSpace())
+            {
+                return null;
+            }
+
+            var match = NarratorRegex.Match(releaseTitle);
+
+            return match.Success ? match.Groups["narrator"].Value.Trim() : null;
+        }
+
+        // Goodreads descriptions carry HTML and line breaks, and some editions only have a catalogue stub
+        // ("262 pages ; 18 cm"). Keep a real description, as plain text on one line, and drop the rest.
+        internal static string CleanDescription(string overview)
+        {
+            if (overview.IsNullOrWhiteSpace())
+            {
+                return null;
+            }
+
+            var text = HtmlTagRegex.Replace(overview, " ");
+            text = WebUtility.HtmlDecode(text);
+            text = WhitespaceRegex.Replace(text, " ").Trim();
+
+            return text.Length >= 40 ? text.Substring(0, Math.Min(text.Length, 4000)) : null;
         }
 
         private string FindCoverPath(Book book, Edition edition)
