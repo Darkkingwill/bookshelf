@@ -237,6 +237,20 @@ namespace NzbDrone.Core.Books
             return all.Where(x => !excluded.Contains(x.ForeignBookId)).ToList();
         }
 
+        // A book with files is never deleted just because the metadata source stops reporting it. The
+        // proxy's author list can come back partial (it is capped and rate limited upstream), and deleting
+        // the missing books would orphan their files. The book is left as it is for this refresh.
+        protected override bool IsChildPinned(Book local)
+        {
+            if (local.Id == 0 || !_mediaFileService.GetFilesByBook(local.Id).Any())
+            {
+                return false;
+            }
+
+            _logger.Warn("Keeping {0}: it has files but the metadata source did not report it", local);
+            return true;
+        }
+
         protected override List<Book> GetLocalChildren(Author entity, List<Book> remoteChildren)
         {
             return _bookService.GetBooksForRefresh(entity.AuthorMetadataId,
