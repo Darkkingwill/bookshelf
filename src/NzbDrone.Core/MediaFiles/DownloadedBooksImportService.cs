@@ -9,6 +9,7 @@ using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Core.Books;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
+using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.MediaFiles.BookImport;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging.Events;
@@ -34,6 +35,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IImportApprovedBooks _importApprovedTracks;
         private readonly IEventAggregator _eventAggregator;
         private readonly IRuntimeInfo _runtimeInfo;
+        private readonly ITrackedDownloadService _trackedDownloadService;
         private readonly Logger _logger;
 
         public DownloadedBooksImportService(IDiskProvider diskProvider,
@@ -44,8 +46,10 @@ namespace NzbDrone.Core.MediaFiles
                                              IImportApprovedBooks importApprovedTracks,
                                              IEventAggregator eventAggregator,
                                              IRuntimeInfo runtimeInfo,
+                                             ITrackedDownloadService trackedDownloadService,
                                              Logger logger)
         {
+            _trackedDownloadService = trackedDownloadService;
             _diskProvider = diskProvider;
             _diskScanService = diskScanService;
             _authorService = authorService;
@@ -153,6 +157,17 @@ namespace NzbDrone.Core.MediaFiles
             }
         }
 
+        // The book a download was grabbed for, when it was grabbed for exactly one - see GrabbedBook.
+        private Book FindGrabbedBook(DownloadClientItem downloadClientItem, Author author)
+        {
+            if (downloadClientItem == null || string.IsNullOrWhiteSpace(downloadClientItem.DownloadId))
+            {
+                return null;
+            }
+
+            return GrabbedBook.From(_trackedDownloadService.Find(downloadClientItem.DownloadId)?.RemoteBook, author);
+        }
+
         private List<ImportResult> ProcessFolder(IDirectoryInfo directoryInfo, ImportMode importMode, DownloadClientItem downloadClientItem)
         {
             var cleanedUpName = GetCleanedUpFolderName(directoryInfo.Name);
@@ -209,7 +224,8 @@ namespace NzbDrone.Core.MediaFiles
 
             var idOverrides = new IdentificationOverrides
             {
-                Author = author
+                Author = author,
+                Book = FindGrabbedBook(downloadClientItem, author)
             };
             var idInfo = new ImportDecisionMakerInfo
             {
@@ -294,7 +310,8 @@ namespace NzbDrone.Core.MediaFiles
 
             var idOverrides = new IdentificationOverrides
             {
-                Author = author
+                Author = author,
+                Book = FindGrabbedBook(downloadClientItem, author)
             };
             var idInfo = new ImportDecisionMakerInfo
             {

@@ -15,6 +15,9 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
         // Anything shorter than this is too easy to hit by accident ("It", "UR", "Us").
         private const int MinimumTitleLength = 4;
 
+        // A title must be at least this long to count as corroboration by containment ("Hunt" is inside far too many names).
+        private const int CorroborationMinimumLength = 6;
+
         // A leading series position such as "3 - ", "7.5 - " or "1-5 - ".
         private static readonly Regex SeriesPrefix = new Regex(@"^[\d.\-\s]+-\s+", RegexOptions.Compiled);
         private static readonly Regex LeadingDash = new Regex(@"^-\s*", RegexOptions.Compiled);
@@ -72,6 +75,18 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             // "The Title" folder against a "Title" book is the same harmless decoration, just on the other side
             return variants.Contains(target) ||
                    (folderTitle.IsNotNullOrWhiteSpace() && variants.Contains(Clean(LeadingArticle.Replace(folderTitle, string.Empty))));
+        }
+
+        // For a book the user explicitly grabbed. The folder of a download is rarely just the title - it is
+        // "Author - Title (new rip)" or similar - so here it is enough for a folder name to *contain* the
+        // grabbed book's title. That is only ever used to corroborate a book we already know, never to pick one.
+        public static bool FolderNamesBook(string bookTitle, params string[] folderNames)
+        {
+            var names = (folderNames ?? new string[0]).Where(x => x.IsNotNullOrWhiteSpace()).Select(Clean).ToList();
+
+            return TitleVariants(bookTitle)
+                .Where(x => x.Length >= CorroborationMinimumLength)
+                .Any(variant => names.Any(name => name.Contains(variant)));
         }
 
         private static HashSet<string> TitleVariants(string title)

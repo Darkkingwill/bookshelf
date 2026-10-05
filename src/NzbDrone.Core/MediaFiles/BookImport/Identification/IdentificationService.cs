@@ -24,6 +24,9 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
         // CloseBookMatchSpecification rejects anything above 0.50 further down the line.
         private const double FolderTitleMatchDistance = 0.10;
 
+        // A tag match at least this close already confirms the book (the same line used to decide a match is "good enough").
+        private const double ConfirmedTagDistance = 0.15;
+
         private readonly ITrackGroupingService _trackGroupingService;
         private readonly IMetadataTagService _metadataTagService;
         private readonly IAugmentingService _augmentingService;
@@ -174,6 +177,13 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
             GetBestRelease(localBookRelease, candidateReleases, allLocalTracks, languages, out var seenCandidate);
 
+            // a book the user picked for this download, whose folder is named after it, outranks useless tags
+            if (TryGrabbedBookFolderMatch(localBookRelease, idOverrides, candidateReleases, languages, allLocalTracks))
+            {
+                localBookRelease.PopulateMatch(config.KeepAllEditions);
+                return;
+            }
+
             if (!seenCandidate)
             {
                 // nothing from the tags - the folder name may still say what this is
@@ -218,6 +228,72 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             localBookRelease.PopulateMatch(config.KeepAllEditions);
 
             _logger.Debug($"IdentifyRelease done in {watch.ElapsedMilliseconds}ms");
+        }
+
+        // A download that was grabbed for one specific book already knows what it is. When the tags cannot confirm
+        // that (an uploader who tagged the publisher as the album, or left the title out), the download's folder
+        // naming the same book is enough: it is two independent statements of one answer. With no such agreement
+        // the tags still decide as before, so a wrong or mixed torrent is not imported just because it was grabbed.
+        private bool TryGrabbedBookFolderMatch(LocalEdition localBookRelease, IdentificationOverrides idOverrides, IEnumerable<CandidateEdition> candidateReleases, EditionLanguagePreference languages, List<LocalBook> allLocalTracks)
+        {
+            var grabbed = idOverrides?.Book;
+
+            if (grabbed == null || idOverrides.Edition != null)
+            {
+                return false;
+            }
+
+            var forced = candidateReleases?.Where(x => x.Edition.BookId == grabbed.Id).ToList();
+
+            if (forced == null || !forced.Any())
+            {
+                return false;
+            }
+
+            // the tags already agree with the grabbed book
+            if (localBookRelease.Edition?.BookId == grabbed.Id &&
+                localBookRelease.Distance.NormalizedDistance() <= ConfirmedTagDistance)
+            {
+                return false;
+            }
+
+            var bookFolder = localBookRelease.LocalBooks
+                .Select(x => Path.GetDirectoryName(x.Path))
+                .Where(x => x.IsNotNullOrWhiteSpace())
+                .GroupBy(x => x, PathEqualityComparer.Instance)
+                .OrderByDescending(x => x.Count())
+                .Select(x => x.Key)
+                .FirstOrDefault();
+
+            if (bookFolder.IsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            // the folder itself and the one above it (a disc folder sits inside the named one)
+            var folderNames = new[] { Path.GetFileName(bookFolder.TrimEnd('/', '\\')), Path.GetFileName(Path.GetDirectoryName(bookFolder) ?? string.Empty) };
+
+            if (!FolderTitleMatcher.FolderNamesBook(grabbed.Title, folderNames))
+            {
+                return false;
+            }
+
+            localBookRelease.Edition = null;
+            GetBestRelease(localBookRelease, forced, allLocalTracks, languages, out _);
+
+            if (localBookRelease.Edition == null)
+            {
+                localBookRelease.Edition = forced.First().Edition;
+                localBookRelease.ExistingTracks = new List<LocalBook>();
+            }
+
+            var distance = new Distance();
+            distance.Add("folder_title", FolderTitleMatchDistance);
+            localBookRelease.Distance = distance;
+
+            _logger.Debug("Matched {0} to the grabbed book {1} because its folder names the book", localBookRelease, localBookRelease.Edition);
+
+            return true;
         }
 
         // Falls back to the name of the book's folder when the tags gave no match, or a match to a different book.
