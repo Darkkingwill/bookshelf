@@ -86,8 +86,12 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
 
             _logger.ProgressInfo("Converting {0} file(s) to M4B for '{1}'", orderedFiles.Count, book.Title);
 
+            // The import renames files to the naming template, which throws away the uploader's chapter names
+            // ("19 - Part 2, Chapter 19"); the import history still has each file's original name.
+            var originalPaths = GetOriginalPaths(book);
+
             var chapterTitles = orderedFiles
-                .Select(f => CleanChapterTitle(Path.GetFileNameWithoutExtension(f.Path)))
+                .Select(f => ChapterTitleFor(originalPaths, f.Path))
                 .ToList();
 
             var coverPath = FindCoverPath(book, edition);
@@ -201,18 +205,58 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
         {
             var title = edition.Title.IsNotNullOrWhiteSpace() ? edition.Title : book.Title;
             var authorName = author.Metadata.Value.Name;
-            var year = edition.ReleaseDate?.Year ?? book.ReleaseDate?.Year;
-
             return new M4bTags
             {
                 Title = title,
                 Album = title,
                 Artist = authorName,
                 AlbumArtist = authorName,
-                Year = year.HasValue && year.Value >= 1500 ? year : null,
+                Year = PickYear(book.ReleaseDate, edition.ReleaseDate),
                 Description = CleanDescription(edition.Overview),
                 Narrator = FindNarrator(book, authorName, orderedFiles)
             };
+        }
+
+        // The year the book was first published. An edition's date is a reprint, so it is only the fallback.
+        internal static int? PickYear(DateTime? bookDate, DateTime? editionDate)
+        {
+            var year = bookDate?.Year ?? editionDate?.Year;
+
+            return year.HasValue && year.Value >= 1500 ? year : null;
+        }
+
+        // importedPath -> the name the file had when it was downloaded, from the import history.
+        private Dictionary<string, string> GetOriginalPaths(Book book)
+        {
+            var originals = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                foreach (var history in _historyService.GetByBook(book.Id, EntityHistoryEventType.BookFileImported).OrderBy(h => h.Date))
+                {
+                    var imported = history.Data.FirstOrDefault(d => d.Key.Equals("importedPath", StringComparison.OrdinalIgnoreCase)).Value;
+                    var dropped = history.Data.FirstOrDefault(d => d.Key.Equals("droppedPath", StringComparison.OrdinalIgnoreCase)).Value;
+
+                    if (imported.IsNotNullOrWhiteSpace() && dropped.IsNotNullOrWhiteSpace())
+                    {
+                        originals[imported] = dropped;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Chapter names are an enrichment; fall back to the library file names.
+                _logger.Debug(ex, "Could not read the original file names for '{0}'", book.Title);
+            }
+
+            return originals;
+        }
+
+        internal static string ChapterTitleFor(IDictionary<string, string> originalPaths, string libraryPath)
+        {
+            var path = originalPaths != null && originalPaths.TryGetValue(libraryPath, out var original) ? original : libraryPath;
+
+            return CleanChapterTitle(Path.GetFileNameWithoutExtension(path));
         }
 
         private string FindNarrator(Book book, string authorName, List<BookFile> orderedFiles)
