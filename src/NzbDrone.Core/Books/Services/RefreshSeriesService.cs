@@ -74,7 +74,10 @@ namespace NzbDrone.Core.Books
         {
             _logger.Trace($"Removing links for series {local} author {local.ForeignAuthorId}");
             var children = GetLocalChildren(local, null);
-            _linkService.DeleteMany(children);
+
+            // A pinned link is a manual fix that must survive refreshes, even when the metadata source no
+            // longer reports the whole series. Only unpinned links go, and the series stays while any remain.
+            _linkService.DeleteMany(children.Where(x => !x.Pinned).ToList());
 
             if (!_linkService.GetLinksBySeries(local.Id).Any())
             {
