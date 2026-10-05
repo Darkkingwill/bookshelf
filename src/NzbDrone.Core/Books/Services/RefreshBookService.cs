@@ -288,6 +288,20 @@ namespace NzbDrone.Core.Books
             return remote.Editions.Value.DistinctBy(m => m.ForeignEditionId).ToList();
         }
 
+        // An edition that holds a file is never deleted just because the remote list omits it. A language
+        // filter can leave a book with no remote editions at all (a book stored under a foreign title whose
+        // English edition carries your file), and deleting the edition would leave the file dangling.
+        protected override bool IsChildPinned(Edition local)
+        {
+            if (local.Id == 0 || !_mediaFileService.GetFilesByEdition(local.Id).Any())
+            {
+                return false;
+            }
+
+            _logger.Warn("Keeping edition {0}: it has files but the metadata source did not report it", local);
+            return true;
+        }
+
         protected override List<Edition> GetLocalChildren(Book entity, List<Edition> remoteChildren)
         {
             return _editionService.GetEditionsForRefresh(entity.Id, remoteChildren.Select(x => x.ForeignEditionId).ToList());
