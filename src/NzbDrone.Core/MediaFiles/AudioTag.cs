@@ -33,6 +33,8 @@ namespace NzbDrone.Core.MediaFiles
         public string Publisher { get; set; }
         public TimeSpan Duration { get; set; }
         public string[] Genres { get; set; }
+        public string Narrator { get; set; }
+        public string Description { get; set; }
         public string ImageFile { get; set; }
         public long ImageSize { get; set; }
 
@@ -94,6 +96,10 @@ namespace NzbDrone.Core.MediaFiles
                 Publisher = tag.Publisher;
                 Duration = file.Properties.Duration;
                 Genres = tag.Genres;
+
+                // The narrator is the composer, the usual place for it in audiobook tags.
+                Narrator = tag.Composers?.FirstOrDefault();
+                Description = tag.Comment;
                 ImageSize = tag.Pictures.FirstOrDefault()?.Data.Count ?? 0;
 
                 DateTime tempDate;
@@ -136,6 +142,9 @@ namespace NzbDrone.Core.MediaFiles
                 {
                     var appletag = (TagLib.Mpeg4.AppleTag)file.GetTag(TagTypes.Apple);
                     Media = appletag.GetDashBox("com.apple.iTunes", "MEDIA");
+
+                    // In M4B the comment atom holds the uploader's own note; the book description lives in "desc".
+                    Description = appletag.DataBoxes(FixAppleId("desc")).FirstOrDefault()?.Text;
                     Date = DateTime.TryParse(appletag.DataBoxes(FixAppleId("day")).FirstOrDefault()?.Text, out tempDate) ? tempDate : default(DateTime?);
                     OriginalReleaseDate = DateTime.TryParse(appletag.GetDashBox("com.apple.iTunes", "Original Date"), out tempDate) ? tempDate : default(DateTime?);
                 }
@@ -326,6 +335,17 @@ namespace NzbDrone.Core.MediaFiles
                 tag.Publisher = Publisher;
                 tag.Genres = Genres;
 
+                // Only set what we know: an unknown narrator or description must not wipe what the file already has.
+                if (Narrator.IsNotNullOrWhiteSpace())
+                {
+                    tag.Composers = new[] { Narrator };
+                }
+
+                if (Description.IsNotNullOrWhiteSpace() && !file.TagTypes.HasFlag(TagTypes.Apple))
+                {
+                    tag.Comment = Description;
+                }
+
                 if (ImageFile.IsNotNullOrWhiteSpace())
                 {
                     tag.Pictures = new IPicture[1] { new Picture(ImageFile) };
@@ -387,6 +407,12 @@ namespace NzbDrone.Core.MediaFiles
                     appletag.SetDashBox("com.apple.iTunes", "Original Date", OriginalReleaseDate.HasValue ? OriginalReleaseDate.Value.ToString("yyyy-MM-dd") : null);
                     appletag.SetDashBox("com.apple.iTunes", "Original Year", OriginalReleaseDate.HasValue ? OriginalReleaseDate.Value.Year.ToString() : null);
                     appletag.SetDashBox("com.apple.iTunes", "MEDIA", Media);
+
+                    if (Description.IsNotNullOrWhiteSpace())
+                    {
+                        appletag.SetText(FixAppleId("desc"), Description);
+                        appletag.SetText(FixAppleId("ldes"), Description);
+                    }
                 }
 
                 file.Save();
@@ -503,6 +529,17 @@ namespace NzbDrone.Core.MediaFiles
             if (!Genres.SequenceEqual(other.Genres))
             {
                 output.Add("Genres", Tuple.Create(string.Join(" / ", Genres), string.Join(" / ", other.Genres)));
+            }
+
+            // Only a value we have counts as a change; not knowing the narrator is not a reason to rewrite a file.
+            if (other.Narrator.IsNotNullOrWhiteSpace() && Narrator != other.Narrator)
+            {
+                output.Add("Narrator", Tuple.Create(Narrator, other.Narrator));
+            }
+
+            if (other.Description.IsNotNullOrWhiteSpace() && Description != other.Description)
+            {
+                output.Add("Description", Tuple.Create(Description, other.Description));
             }
 
             if (ImageSize != other.ImageSize)

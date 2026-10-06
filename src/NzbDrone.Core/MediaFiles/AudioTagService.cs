@@ -7,6 +7,7 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.Books;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.History;
 using NzbDrone.Core.MediaCover;
 using NzbDrone.Core.MediaFiles.Commands;
 using NzbDrone.Core.MediaFiles.Events;
@@ -36,6 +37,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IAuthorService _authorService;
         private readonly IMapCoversToLocal _mediaCoverService;
         private readonly IEventAggregator _eventAggregator;
+        private readonly IHistoryService _historyService;
         private readonly Logger _logger;
 
         public AudioTagService(IConfigService configService,
@@ -45,8 +47,10 @@ namespace NzbDrone.Core.MediaFiles
                                IAuthorService authorService,
                                IMapCoversToLocal mediaCoverService,
                                IEventAggregator eventAggregator,
+                               IHistoryService historyService,
                                Logger logger)
         {
+            _historyService = historyService;
             _configService = configService;
             _mediaFileService = mediaFileService;
             _diskProvider = diskProvider;
@@ -107,15 +111,34 @@ namespace NzbDrone.Core.MediaFiles
 
                 // We may have omitted media so index in the list isn't the same as medium number
                 Media = fileTags.Media,
-                Date = edition.ReleaseDate,
-                Year = (uint)(edition.ReleaseDate?.Year ?? 0),
+
+                // An audiobook is dated by when the book was first published; an edition's date is a reprint.
+                Date = book.ReleaseDate ?? edition.ReleaseDate,
+                Year = (uint)((book.ReleaseDate ?? edition.ReleaseDate)?.Year ?? 0),
                 OriginalReleaseDate = book.ReleaseDate,
                 OriginalYear = (uint)(book.ReleaseDate?.Year ?? 0),
                 Publisher = edition.Publisher,
-                Genres = new string[0],
+                Genres = new[] { "Audiobook" },
+                Narrator = FindNarrator(book, fileTags.Narrator),
+                Description = AudiobookTagText.CleanDescription(edition.Overview),
                 ImageFile = imageFile,
                 ImageSize = imageSize,
             };
+        }
+
+        // The narrator the book's grabbed release names, else whatever the file already says.
+        private string FindNarrator(Book book, string narratorInFile)
+        {
+            try
+            {
+                return AudiobookTagText.NarratorFromGrabs(_historyService.GetByBook(book.Id, EntityHistoryEventType.Grabbed))
+                       ?? narratorInFile;
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Could not look up the narrator for '{0}'", book.Title);
+                return narratorInFile;
+            }
         }
 
         private void UpdateTrackfileSizeAndModified(BookFile trackfile, string path)

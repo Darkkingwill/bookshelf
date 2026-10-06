@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Text.RegularExpressions;
 using NLog;
 using NzbDrone.Common.Disk;
@@ -21,9 +20,6 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
     public class M4bConversionService : IExecute<ConvertToM4bCommand>
     {
         private static readonly Regex LeadingTrackNumberRegex = new Regex(@"^[\d\s._-]+", RegexOptions.Compiled);
-        private static readonly Regex NarratorRegex = new Regex(@"narrated by\s+(?<narrator>[^\[\(]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly Regex HtmlTagRegex = new Regex(@"<[^>]+>", RegexOptions.Compiled);
-        private static readonly Regex WhitespaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
 
         private readonly IBookService _bookService;
         private readonly IAuthorService _authorService;
@@ -263,10 +259,7 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
         {
             try
             {
-                var grabbed = _historyService.GetByBook(book.Id, EntityHistoryEventType.Grabbed)
-                    .OrderByDescending(h => h.Date)
-                    .Select(h => ParseNarrator(h.SourceTitle))
-                    .FirstOrDefault(n => n.IsNotNullOrWhiteSpace());
+                var grabbed = AudiobookTagText.NarratorFromGrabs(_historyService.GetByBook(book.Id, EntityHistoryEventType.Grabbed));
 
                 if (grabbed.IsNotNullOrWhiteSpace())
                 {
@@ -294,33 +287,14 @@ namespace NzbDrone.Core.MediaFiles.M4bConversion
             return null;
         }
 
-        // Release titles look like "Title by Author, narrated by Jane Doe [ENG / M4B]".
         internal static string ParseNarrator(string releaseTitle)
         {
-            if (releaseTitle.IsNullOrWhiteSpace())
-            {
-                return null;
-            }
-
-            var match = NarratorRegex.Match(releaseTitle);
-
-            return match.Success ? match.Groups["narrator"].Value.Trim() : null;
+            return AudiobookTagText.ParseNarrator(releaseTitle);
         }
 
-        // Goodreads descriptions carry HTML and line breaks, and some editions only have a catalogue stub
-        // ("262 pages ; 18 cm"). Keep a real description, as plain text on one line, and drop the rest.
         internal static string CleanDescription(string overview)
         {
-            if (overview.IsNullOrWhiteSpace())
-            {
-                return null;
-            }
-
-            var text = HtmlTagRegex.Replace(overview, " ");
-            text = WebUtility.HtmlDecode(text);
-            text = WhitespaceRegex.Replace(text, " ").Trim();
-
-            return text.Length >= 40 ? text.Substring(0, Math.Min(text.Length, 4000)) : null;
+            return AudiobookTagText.CleanDescription(overview);
         }
 
         private string FindCoverPath(Book book, Edition edition)
