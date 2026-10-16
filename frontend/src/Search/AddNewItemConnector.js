@@ -18,7 +18,6 @@ function createMapStateToProps() {
       return {
         ...search,
         term: params.term,
-        source: params.source,
         hasExistingAuthors: existingAuthorsCount > 0
       };
     }
@@ -57,7 +56,7 @@ class AddNewItemConnector extends Component {
   //
   // Listeners
 
-  onSearchChange = (term, source) => {
+  onSearchChange = (term) => {
     if (this._searchTimeout) {
       clearTimeout(this._searchTimeout);
     }
@@ -66,7 +65,7 @@ class AddNewItemConnector extends Component {
       this.props.clearSearchResults();
     } else {
       this._searchTimeout = setTimeout(() => {
-        this.props.getSearchResults({ term, source });
+        this.props.getSearchResults({ term });
       }, 300);
     }
   };
@@ -81,14 +80,12 @@ class AddNewItemConnector extends Component {
   render() {
     const {
       term,
-      source,
       ...otherProps
     } = this.props;
 
     return (
       <AddNewItem
         term={term}
-        source={source}
         {...otherProps}
         onSearchChange={this.onSearchChange}
         onClearSearch={this.onClearSearch}
@@ -99,7 +96,6 @@ class AddNewItemConnector extends Component {
 
 AddNewItemConnector.propTypes = {
   term: PropTypes.string,
-  source: PropTypes.string,
   getSearchResults: PropTypes.func.isRequired,
   clearSearchResults: PropTypes.func.isRequired,
   fetchRootFolders: PropTypes.func.isRequired

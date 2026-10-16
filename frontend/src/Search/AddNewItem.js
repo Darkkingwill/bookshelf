@@ -1,7 +1,6 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import Alert from 'Components/Alert';
-import SelectInput from 'Components/Form/SelectInput';
 import TextInput from 'Components/Form/TextInput';
 import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
@@ -10,7 +9,6 @@ import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import PageContent from 'Components/Page/PageContent';
 import PageContentBody from 'Components/Page/PageContentBody';
 import { icons, kinds } from 'Helpers/Props';
-import fetchSearchSources from 'Utilities/fetchSearchSources';
 import getErrorMessage from 'Utilities/Object/getErrorMessage';
 import translate from 'Utilities/String/translate';
 import AddNewAuthorSearchResultConnector from './Author/AddNewAuthorSearchResultConnector';
@@ -27,8 +25,6 @@ class AddNewItem extends Component {
 
     this.state = {
       term: props.term || '',
-      source: props.source || '',
-      sources: [],
       isFetching: false
     };
   }
@@ -36,41 +32,28 @@ class AddNewItem extends Component {
   componentDidMount() {
     const term = this.state.term;
 
-    fetchSearchSources().then((sources) => {
-      if (!this._isUnmounted) {
-        this.setState({ sources });
-      }
-    });
-
     if (term) {
-      this.props.onSearchChange(term, this.state.source);
+      this.props.onSearchChange(term);
     }
   }
 
   componentDidUpdate(prevProps) {
     const {
       term,
-      source,
       isFetching
     } = this.props;
 
-    if (term && (term !== prevProps.term || source !== prevProps.source)) {
-      // Coming from the header search: adopt the source it picked along with the term.
+    if (term && term !== prevProps.term) {
       this.setState({
         term,
-        source: source || '',
         isFetching: true
       });
-      this.props.onSearchChange(term, source || '');
+      this.props.onSearchChange(term);
     } else if (isFetching !== prevProps.isFetching) {
       this.setState({
         isFetching
       });
     }
-  }
-
-  componentWillUnmount() {
-    this._isUnmounted = true;
   }
 
   //
@@ -81,18 +64,9 @@ class AddNewItem extends Component {
 
     this.setState({ term: value, isFetching: hasValue }, () => {
       if (hasValue) {
-        this.props.onSearchChange(value, this.state.source);
+        this.props.onSearchChange(value);
       } else {
         this.props.onClearSearch();
-      }
-    });
-  };
-
-  onSearchSourceChange = ({ value }) => {
-    this.setState({ source: value }, () => {
-      if (this.state.term.trim()) {
-        this.setState({ isFetching: true });
-        this.props.onSearchChange(this.state.term, value);
       }
     });
   };
@@ -113,11 +87,6 @@ class AddNewItem extends Component {
     } = this.props;
 
     const term = this.state.term;
-    const source = this.state.source;
-    const searchSourceOptions = [
-      { key: '', value: 'Default' },
-      ...this.state.sources.map((x) => ({ key: x.key, value: x.name }))
-    ];
     const isFetching = this.state.isFetching;
 
     return (
@@ -138,14 +107,6 @@ class AddNewItem extends Component {
               placeholder={translate('SearchBoxPlaceHolder')}
               autoFocus={true}
               onChange={this.onSearchInputChange}
-            />
-
-            <SelectInput
-              className={styles.searchSourceInput}
-              name="searchSource"
-              value={source}
-              values={searchSourceOptions}
-              onChange={this.onSearchSourceChange}
             />
 
             <Button
@@ -261,7 +222,6 @@ class AddNewItem extends Component {
 
 AddNewItem.propTypes = {
   term: PropTypes.string,
-  source: PropTypes.string,
   isFetching: PropTypes.bool.isRequired,
   error: PropTypes.object,
   isAdding: PropTypes.bool.isRequired,
