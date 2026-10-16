@@ -92,9 +92,10 @@ namespace NzbDrone.Core.Jobs
 
                     new ScheduledTask
                     {
-                        // Weekly, not daily: authors only hold the books you own, so there is little to refresh,
-                        // and each refresh is a chance for a partial metadata answer to touch the library.
-                        Interval = 7 * 24 * 60,
+                        // Off (0): authors only hold the books you own, so there is nothing new to find, and
+                        // each refresh is a chance for a partial metadata answer to touch the library.
+                        // A refresh can still be run by hand or happens when an author is edited.
+                        Interval = 0,
                         TypeName = typeof(RefreshAuthorCommand).FullName
                     },
 
