@@ -157,11 +157,17 @@ namespace NzbDrone.Core.MediaFiles
         public void RemoveAllTags(string path)
         {
             TagLib.File file = null;
+            Mp4SaveGuard guard = null;
             try
             {
-                file = TagLib.File.Create(path);
+                guard = Mp4SaveGuard.Begin(path);
+                file = AudioTag.OpenForSave(path);
                 file.RemoveTags(TagLib.TagTypes.AllTags);
+                guard?.SaveStarting();
                 file.Save();
+                file.Dispose();
+                file = null;
+                guard?.Commit();
             }
             catch (CorruptFileException ex)
             {
@@ -177,6 +183,7 @@ namespace NzbDrone.Core.MediaFiles
             finally
             {
                 file?.Dispose();
+                guard?.Dispose();
             }
         }
 
@@ -212,9 +219,15 @@ namespace NzbDrone.Core.MediaFiles
 
             _logger.Debug($"Writing tags for {trackfile}");
 
-            newTags.Write(path);
+            var written = newTags.Write(path);
 
             UpdateTrackfileSizeAndModified(trackfile, path);
+
+            if (!written)
+            {
+                _logger.Warn($"Tags were not written to {trackfile}");
+                return;
+            }
 
             _eventAggregator.PublishEvent(new BookFileRetaggedEvent(trackfile.Author.Value, trackfile, diff, _configService.ScrubAudioTags));
         }

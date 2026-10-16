@@ -307,7 +307,14 @@ namespace NzbDrone.Core.MediaFiles
             return null;
         }
 
-        public void Write(string path)
+        // Files that are going to be saved are opened through here: for MP4s that is a TagLib file that reads boxes it
+        // does not know (chapter lists) correctly, otherwise saving would rewrite them damaged.
+        internal static TagLib.File OpenForSave(string path)
+        {
+            return Mp4SaveGuard.IsMp4(path) ? new Mp4SafeFile(path) : TagLib.File.Create(path);
+        }
+
+        public bool Write(string path)
         {
             Logger.Debug($"Starting tag write for {path}");
 
@@ -318,9 +325,11 @@ namespace NzbDrone.Core.MediaFiles
             Genres = Genres ?? new string[0];
 
             TagLib.File file = null;
+            Mp4SaveGuard guard = null;
             try
             {
-                file = TagLib.File.Create(path);
+                guard = Mp4SaveGuard.Begin(path);
+                file = OpenForSave(path);
                 var tag = file.Tag;
 
                 // do the ones with direct support in TagLib
@@ -415,7 +424,13 @@ namespace NzbDrone.Core.MediaFiles
                     }
                 }
 
+                guard?.SaveStarting();
                 file.Save();
+                file.Dispose();
+                file = null;
+
+                // re-read what was written and put the original back if it is damaged
+                return guard?.Commit() ?? true;
             }
             catch (CorruptFileException ex)
             {
@@ -431,7 +446,10 @@ namespace NzbDrone.Core.MediaFiles
             finally
             {
                 file?.Dispose();
+                guard?.Dispose();
             }
+
+            return false;
         }
 
         public Dictionary<string, Tuple<string, string>> Diff(AudioTag other)

@@ -85,6 +85,111 @@ namespace NzbDrone.Core.Test.MediaFiles
             return new byte[0];
         }
 
+        // The whole 'chpl' chapter box (header included) as it sits in the file.
+        private static byte[] ChapterBox(string path)
+        {
+            var bytes = File.ReadAllBytes(path);
+            var type = System.Text.Encoding.ASCII.GetBytes("chpl");
+
+            for (var i = 4; i + 4 <= bytes.Length; i++)
+            {
+                if (bytes[i] == type[0] && bytes[i + 1] == type[1] && bytes[i + 2] == type[2] && bytes[i + 3] == type[3])
+                {
+                    var size = (bytes[i - 4] << 24) | (bytes[i - 3] << 16) | (bytes[i - 2] << 8) | bytes[i - 1];
+                    return bytes.Skip(i - 4).Take(size).ToArray();
+                }
+            }
+
+            return new byte[0];
+        }
+
+        [Test]
+        public void should_keep_the_chapter_list_in_the_user_data_byte_for_byte()
+        {
+            // ffmpeg keeps its chapters in a 'chpl' box next to the tags; TagLib reads such boxes 24 bytes late
+            var chaptersBefore = ChapterBox(_original);
+            chaptersBefore.Length.Should().BeGreaterThan(8);
+
+            NewTags(new AudioTag(_path)).Write(_path).Should().BeTrue();
+
+            ChapterBox(_path).Should().Equal(chaptersBefore);
+        }
+
+        [Test]
+        public void should_catch_and_undo_a_save_that_damages_the_file()
+        {
+            var originalBytes = File.ReadAllBytes(_path);
+
+            // saving through plain TagLib is what shortens and shifts the chapter box
+            using (var guard = Mp4SaveGuard.Begin(_path))
+            {
+                guard.Should().NotBeNull();
+                guard.SaveStarting();
+
+                using (var file = TagLib.File.Create(_path))
+                {
+                    file.Tag.Title = "A much longer title than the one the file had to begin with";
+                    file.Save();
+                }
+
+                ChapterBox(_path).Should().NotEqual(ChapterBox(_original));
+
+                guard.Commit().Should().BeFalse();
+            }
+
+            File.ReadAllBytes(_path).Should().Equal(originalBytes);
+        }
+
+        [Test]
+        public void should_undo_a_save_whose_sizes_do_not_add_up()
+        {
+            var originalBytes = File.ReadAllBytes(_path);
+
+            using (var guard = Mp4SaveGuard.Begin(_path))
+            {
+                guard.SaveStarting();
+
+                // make the user data box a few bytes too small so the chapter box overruns it
+                var bytes = File.ReadAllBytes(_path);
+                var udta = System.Text.Encoding.ASCII.GetBytes("udta");
+                var at = 0;
+
+                for (var i = 4; i + 4 <= bytes.Length; i++)
+                {
+                    if (bytes[i] == udta[0] && bytes[i + 1] == udta[1] && bytes[i + 2] == udta[2] && bytes[i + 3] == udta[3])
+                    {
+                        at = i - 4;
+                        break;
+                    }
+                }
+
+                bytes[at + 3] -= 24;
+                File.WriteAllBytes(_path, bytes);
+
+                guard.Commit().Should().BeFalse();
+            }
+
+            File.ReadAllBytes(_path).Should().Equal(originalBytes);
+        }
+
+        [Test]
+        public void should_leave_no_backup_files_behind()
+        {
+            NewTags(new AudioTag(_path)).Write(_path).Should().BeTrue();
+
+            Directory.GetFiles(Path.GetDirectoryName(_path), Path.GetFileName(_path) + ".*.tagbak").Should().BeEmpty();
+        }
+
+        [Test]
+        public void should_not_let_removing_the_tags_damage_the_chapters()
+        {
+            var chaptersBefore = ChapterBox(_original);
+
+            new AudioTagService(null, null, null, null, null, null, null, null, NLog.LogManager.GetCurrentClassLogger()).RemoveAllTags(_path);
+
+            ChapterBox(_path).Should().Equal(chaptersBefore);
+        }
+
         [Test]
         public void should_write_the_narrator_and_description_to_an_m4b()
         {
