@@ -10,7 +10,8 @@ namespace NzbDrone.Common.Test.EnvironmentInfo
         [Test]
         public void should_return_version()
         {
-            BuildInfo.Version.Major.Should().BeOneOf(0, 10);
+            // 0 for a local build, 10 for upstream Readarr, 1 for this fork's CI (READARR_VERSION 1.0.<run>).
+            BuildInfo.Version.Major.Should().BeOneOf(0, 1, 10);
         }
 
         [Test]
