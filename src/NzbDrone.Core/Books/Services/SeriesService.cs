@@ -6,6 +6,7 @@ namespace NzbDrone.Core.Books
     {
         Series FindById(string foreignSeriesId);
         List<Series> FindById(List<string> foreignSeriesId);
+        Series FindByTitle(string title);
         List<Series> GetByAuthorMetadataId(int authorMetadataId);
         List<Series> GetByAuthorId(int authorId);
         void Delete(int seriesId);
@@ -30,6 +31,11 @@ namespace NzbDrone.Core.Books
         public List<Series> FindById(List<string> foreignSeriesId)
         {
             return _seriesRepository.FindById(foreignSeriesId);
+        }
+
+        public Series FindByTitle(string title)
+        {
+            return _seriesRepository.FindByTitle(title);
         }
 
         public List<Series> GetByAuthorMetadataId(int authorMetadataId)

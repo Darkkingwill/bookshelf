@@ -4,6 +4,7 @@ using System.Linq;
 using FluentValidation;
 using FluentValidation.Results;
 using NLog;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.ImportLists.Exclusions;
 using NzbDrone.Core.MetadataSource;
@@ -21,6 +22,8 @@ namespace NzbDrone.Core.Books
         private readonly IAuthorService _authorService;
         private readonly IAddAuthorService _addAuthorService;
         private readonly IBookService _bookService;
+        private readonly ISeriesService _seriesService;
+        private readonly ISeriesBookLinkService _seriesBookLinkService;
         private readonly IProvideBookInfo _bookInfo;
         private readonly IImportListExclusionService _importListExclusionService;
         private readonly Logger _logger;
@@ -28,6 +31,8 @@ namespace NzbDrone.Core.Books
         public AddBookService(IAuthorService authorService,
                                IAddAuthorService addAuthorService,
                                IBookService bookService,
+                               ISeriesService seriesService,
+                               ISeriesBookLinkService seriesBookLinkService,
                                IProvideBookInfo bookInfo,
                                IImportListExclusionService importListExclusionService,
                                Logger logger)
@@ -35,6 +40,8 @@ namespace NzbDrone.Core.Books
             _authorService = authorService;
             _addAuthorService = addAuthorService;
             _bookService = bookService;
+            _seriesService = seriesService;
+            _seriesBookLinkService = seriesBookLinkService;
             _bookInfo = bookInfo;
             _importListExclusionService = importListExclusionService;
             _logger = logger;
@@ -44,7 +51,7 @@ namespace NzbDrone.Core.Books
         {
             _logger.Debug($"Adding book {book}");
 
-            book = AddSkyhookData(book);
+            book = AddSkyhookData(book, out var seriesLink);
 
             // we allow adding extra editions, so check if the book already exists
             var dbBook = _bookService.FindById(book.ForeignBookId);
@@ -83,7 +90,62 @@ namespace NzbDrone.Core.Books
             book.AuthorMetadataId = dbAuthor.AuthorMetadataId;
             _bookService.AddBook(book, doRefresh);
 
+            // The metadata the book was added from knows its series, but the author feed the later
+            // refresh uses often doesn't, so link it now - before the first import names the folder.
+            LinkSeries(book, seriesLink);
+
             return book;
+        }
+
+        // Pinned so a refresh never deletes it: RefreshSeriesService only removes unpinned links when
+        // the author feed doesn't report the series.
+        private void LinkSeries(Book book, SeriesBookLink source)
+        {
+            var title = source?.Series?.Value?.Title?.Trim();
+
+            if (title.IsNullOrWhiteSpace())
+            {
+                return;
+            }
+
+            try
+            {
+                if (_seriesBookLinkService.GetLinksByBook(new List<int> { book.Id }).Any())
+                {
+                    return;
+                }
+
+                var foreignSeriesId = "goodreads-title:" + title.ToLowerInvariant();
+                var series = _seriesService.FindById(foreignSeriesId) ?? _seriesService.FindByTitle(title);
+
+                if (series == null)
+                {
+                    series = new Series
+                    {
+                        ForeignSeriesId = foreignSeriesId,
+                        Title = title,
+                        Numbered = true,
+                        WorkCount = 1
+                    };
+
+                    _seriesService.InsertMany(new List<Series> { series });
+                }
+
+                _seriesBookLinkService.Insert(new SeriesBookLink
+                {
+                    SeriesId = series.Id,
+                    BookId = book.Id,
+                    Position = source.Position,
+                    SeriesPosition = source.SeriesPosition,
+                    IsPrimary = false,
+                    Pinned = true
+                });
+            }
+            catch (Exception ex)
+            {
+                // The book is already added, a missing series link must not fail the add.
+                _logger.Warn(ex, "Failed to link series '{0}' for book {1}", title, book);
+            }
         }
 
         public List<Book> AddBooks(List<Book> books, bool doRefresh = true)
@@ -108,7 +170,7 @@ namespace NzbDrone.Core.Books
             return addedBooks;
         }
 
-        private Book AddSkyhookData(Book newBook)
+        private Book AddSkyhookData(Book newBook, out SeriesBookLink seriesLink)
         {
             var editionId = newBook.Editions.Value.Single(x => x.Monitored).ForeignEditionId;
 
@@ -132,6 +194,12 @@ namespace NzbDrone.Core.Books
                                                   new ValidationFailure("GoodreadsId", "A book with this ID was not found", newBook.ForeignBookId)
                                               });
             }
+
+            // Same pick as the "Series #N" text on a search result: lowest series position first.
+            seriesLink = tuple.Item2.SeriesLinks?.Value?
+                .Where(x => x.Series?.Value?.Title.IsNotNullOrWhiteSpace() ?? false)
+                .OrderBy(x => x.SeriesPosition)
+                .FirstOrDefault();
 
             newBook.UseMetadataFrom(tuple.Item2);
             newBook.Added = DateTime.UtcNow;
