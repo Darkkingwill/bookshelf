@@ -68,8 +68,13 @@ class ChangeBookModalContent extends Component {
 
     const currentBook = items.find((book) => book.id === currentBookId);
 
+    // Keyed so the confirm step never shares DOM nodes with the book list: otherwise the
+    // Back button is reused as the list's Cancel button and a single click closes the modal.
     return (
-      <ModalContent onModalClose={onModalClose}>
+      <ModalContent
+        key="confirm"
+        onModalClose={onModalClose}
+      >
         <ModalHeader>
           {translate('ChangeBook')}
         </ModalHeader>
@@ -137,7 +142,10 @@ class ChangeBookModalContent extends Component {
       items;
 
     return (
-      <ModalContent onModalClose={onModalClose}>
+      <ModalContent
+        key="list"
+        onModalClose={onModalClose}
+      >
         <ModalHeader>
           {translate('ChangeBook')}
         </ModalHeader>
