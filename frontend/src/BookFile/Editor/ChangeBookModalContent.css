@@ -13,6 +13,11 @@
   margin-bottom: 20px;
 }
 
+.error {
+  flex: 0 0 auto;
+  margin-bottom: 20px;
+}
+
 .scroller {
   flex: 1 1 auto;
   max-height: 60vh;

@@ -32,6 +32,7 @@ class ChangeBookRow extends Component {
   render() {
     const {
       title,
+      seriesTitle,
       releaseDate,
       isCurrent
     } = this.props;
@@ -40,6 +41,13 @@ class ChangeBookRow extends Component {
       <TableRowButton onPress={this.onPress}>
         <TableRowCell className={styles.title}>
           {title}
+          {
+            seriesTitle ?
+              <span className={styles.series}>
+                {seriesTitle}
+              </span> :
+              null
+          }
           {
             isCurrent ?
               <span className={styles.current}>
@@ -60,6 +68,7 @@ class ChangeBookRow extends Component {
 ChangeBookRow.propTypes = {
   id: PropTypes.number.isRequired,
   title: PropTypes.string.isRequired,
+  seriesTitle: PropTypes.string,
   releaseDate: PropTypes.string,
   editions: PropTypes.arrayOf(PropTypes.object),
   isCurrent: PropTypes.bool,

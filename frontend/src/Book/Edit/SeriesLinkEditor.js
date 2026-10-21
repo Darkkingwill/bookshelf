@@ -5,6 +5,7 @@ import TextInput from 'Components/Form/TextInput';
 import Button from 'Components/Link/Button';
 import SpinnerButton from 'Components/Link/SpinnerButton';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
+import ConfirmModal from 'Components/Modal/ConfirmModal';
 import { kinds } from 'Helpers/Props';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 
@@ -32,6 +33,8 @@ class SeriesLinkEditor extends Component {
       saveSuccess: false,
       links: [],
       availableSeries: [],
+      availableSeriesError: false,
+      confirmRemoveLink: null,
       newSeriesId: '',
       newPosition: '',
       isAdding: false,
@@ -49,12 +52,16 @@ class SeriesLinkEditor extends Component {
   //
   // Control
 
-  fetchLinks() {
+  // With merge set (after adding a link) existing rows are kept as they are, so
+  // overrides typed but not yet saved are not thrown away; only new links are added.
+  fetchLinks(merge = false) {
     const {
       bookId
     } = this.props;
 
-    this.setState({ isFetching: true, error: null });
+    if (!merge) {
+      this.setState({ isFetching: true, error: null });
+    }
 
     const { request } = createAjaxRequest({
       url: `/series/link?bookIds=${bookId}`,
@@ -63,14 +70,22 @@ class SeriesLinkEditor extends Component {
     });
 
     request.done((data) => {
-      this.setState({
+      this.setState((prevState) => ({
         isFetching: false,
         isPopulated: true,
-        links: data
-      });
+        links: merge ?
+          [...prevState.links, ...data.filter((link) => !prevState.links.some((existing) => existing.id === link.id))] :
+          data
+      }));
     });
 
     request.fail((xhr) => {
+      if (merge) {
+        // The link was added; the list just could not be refreshed.
+        this.setState({ addError: xhr });
+        return;
+      }
+
       this.setState({
         isFetching: false,
         isPopulated: false,
@@ -98,8 +113,16 @@ class SeriesLinkEditor extends Component {
       });
 
       seriesRequest.done((data) => {
-        this.setState({ availableSeries: data });
+        this.setState({ availableSeries: data, availableSeriesError: false });
       });
+
+      seriesRequest.fail(() => {
+        this.setState({ availableSeriesError: true });
+      });
+    });
+
+    bookRequest.fail(() => {
+      this.setState({ availableSeriesError: true });
     });
   }
 
@@ -207,7 +230,7 @@ class SeriesLinkEditor extends Component {
         newSeriesId: '',
         newPosition: ''
       });
-      this.fetchLinks();
+      this.fetchLinks(true);
     });
 
     request.fail((xhr) => {
@@ -218,8 +241,22 @@ class SeriesLinkEditor extends Component {
     });
   };
 
-  onRemovePress = (linkId) => {
-    this.setState({ removingId: linkId, removeError: null });
+  onRemovePress = (link) => {
+    this.setState({ confirmRemoveLink: link });
+  };
+
+  onConfirmRemoveClose = () => {
+    this.setState({ confirmRemoveLink: null });
+  };
+
+  onConfirmRemove = () => {
+    const linkId = this.state.confirmRemoveLink.id;
+
+    this.setState({
+      confirmRemoveLink: null,
+      removingId: linkId,
+      removeError: null
+    });
 
     const { request } = createAjaxRequest({
       url: `/series/link/${linkId}`,
@@ -254,6 +291,8 @@ class SeriesLinkEditor extends Component {
       saveError,
       saveSuccess,
       availableSeries,
+      availableSeriesError,
+      confirmRemoveLink,
       newSeriesId,
       newPosition,
       isAdding,
@@ -320,7 +359,7 @@ class SeriesLinkEditor extends Component {
                   <Button
                     kind={kinds.DANGER}
                     isDisabled={removingId === link.id}
-                    onPress={() => this.onRemovePress(link.id)}
+                    onPress={() => this.onRemovePress(link)}
                   >
                     {removingId === link.id ? 'Removing...' : 'Remove from series'}
                   </Button>
@@ -422,7 +461,14 @@ class SeriesLinkEditor extends Component {
           </div>
 
           {
-            !seriesOptions.length &&
+            availableSeriesError &&
+              <Alert kind={kinds.WARNING}>
+                Unable to load this author's series
+              </Alert>
+          }
+
+          {
+            !availableSeriesError && !seriesOptions.length &&
               <div style={{ opacity: 0.7, fontSize: 12 }}>
                 No other series found for this author.
               </div>
@@ -478,6 +524,20 @@ class SeriesLinkEditor extends Component {
               </Alert>
           }
         </div>
+
+        <ConfirmModal
+          isOpen={!!confirmRemoveLink}
+          kind={kinds.DANGER}
+          title="Remove from series"
+          message={
+            confirmRemoveLink ?
+              `Remove this book from "${confirmRemoveLink.seriesTitle}"? Any title or position override and pin on this link will be lost.` :
+              ''
+          }
+          confirmLabel="Remove"
+          onConfirm={this.onConfirmRemove}
+          onCancel={this.onConfirmRemoveClose}
+        />
       </div>
     );
   }

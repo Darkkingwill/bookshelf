@@ -2,6 +2,7 @@
 // Please do not change this file!
 interface CssExports {
   'current': string;
+  'series': string;
   'title': string;
 }
 export const cssExports: CssExports;

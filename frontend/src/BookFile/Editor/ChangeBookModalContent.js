@@ -1,7 +1,9 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import TextInput from 'Components/Form/TextInput';
 import Button from 'Components/Link/Button';
+import SpinnerButton from 'Components/Link/SpinnerButton';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
@@ -10,7 +12,7 @@ import ModalHeader from 'Components/Modal/ModalHeader';
 import Scroller from 'Components/Scroller/Scroller';
 import Table from 'Components/Table/Table';
 import TableBody from 'Components/Table/TableBody';
-import { scrollDirections } from 'Helpers/Props';
+import { kinds, scrollDirections } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import ChangeBookRow from './ChangeBookRow';
 import styles from './ChangeBookModalContent.css';
@@ -51,19 +53,86 @@ class ChangeBookModalContent extends Component {
   //
   // Render
 
+  renderConfirm() {
+    const {
+      items,
+      isSaving,
+      hasSaveError,
+      fileCount,
+      currentBookId,
+      pendingBook,
+      onConfirm,
+      onBack,
+      onModalClose
+    } = this.props;
+
+    const currentBook = items.find((book) => book.id === currentBookId);
+
+    return (
+      <ModalContent onModalClose={onModalClose}>
+        <ModalHeader>
+          {translate('ChangeBook')}
+        </ModalHeader>
+
+        <ModalBody>
+          <div>
+            {translate('ChangeBookConfirmMessage', [fileCount, currentBook ? currentBook.title : '?', pendingBook.title])}
+          </div>
+
+          {
+            hasSaveError ?
+              <Alert
+                className={styles.error}
+                kind={kinds.DANGER}
+              >
+                {translate('ChangeBookFailed')}
+              </Alert> :
+              null
+          }
+        </ModalBody>
+
+        <ModalFooter>
+          <Button
+            isDisabled={isSaving}
+            onPress={onBack}
+          >
+            {translate('Back')}
+          </Button>
+
+          <SpinnerButton
+            kind={kinds.DANGER}
+            isSpinning={isSaving}
+            onPress={onConfirm}
+          >
+            {translate('ChangeBook')}
+          </SpinnerButton>
+        </ModalFooter>
+      </ModalContent>
+    );
+  }
+
   render() {
     const {
       items,
       isFetching,
       currentBookId,
+      pendingBook,
+      noEditionBook,
       onBookSelect,
       onModalClose
     } = this.props;
 
+    if (pendingBook) {
+      return this.renderConfirm();
+    }
+
     const filter = this.state.filter.toLowerCase();
 
     const filtered = filter ?
-      items.filter((book) => book.title.toLowerCase().includes(filter)) :
+      items.filter((book) => {
+        return book.title.toLowerCase().includes(filter) ||
+          (book.seriesTitle || '').toLowerCase().includes(filter);
+      }) :
       items;
 
     return (
@@ -85,6 +154,17 @@ class ChangeBookModalContent extends Component {
             onChange={this.onFilterChange}
           />
 
+          {
+            noEditionBook ?
+              <Alert
+                className={styles.error}
+                kind={kinds.WARNING}
+              >
+                {translate('ChangeBookNoEdition', [noEditionBook.title])}
+              </Alert> :
+              null
+          }
+
           <Scroller
             className={styles.scroller}
             autoFocus={false}
@@ -101,6 +181,7 @@ class ChangeBookModalContent extends Component {
                             key={item.id}
                             id={item.id}
                             title={item.title}
+                            seriesTitle={item.seriesTitle}
                             releaseDate={item.releaseDate}
                             editions={item.editions}
                             isCurrent={item.id === currentBookId}
@@ -128,8 +209,15 @@ class ChangeBookModalContent extends Component {
 ChangeBookModalContent.propTypes = {
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
   isFetching: PropTypes.bool.isRequired,
+  isSaving: PropTypes.bool.isRequired,
+  hasSaveError: PropTypes.bool.isRequired,
+  fileCount: PropTypes.number.isRequired,
   currentBookId: PropTypes.number,
+  pendingBook: PropTypes.object,
+  noEditionBook: PropTypes.object,
   onBookSelect: PropTypes.func.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+  onBack: PropTypes.func.isRequired,
   onModalClose: PropTypes.func.isRequired
 };
 

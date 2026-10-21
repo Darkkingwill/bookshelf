@@ -2,6 +2,12 @@
   composes: cell from '~Components/Table/Cells/TableRowCell.css';
 }
 
+.series {
+  margin-left: 10px;
+  color: var(--darkGray);
+  font-size: $smallFontSize;
+}
+
 .current {
   margin-left: 10px;
   color: var(--themeDarkColor);
