@@ -12,18 +12,7 @@ class ChangeBookRow extends Component {
   // Listeners
 
   onPress = () => {
-    const {
-      id,
-      editions
-    } = this.props;
-
-    // A book's files hang off an edition, not the book, so resolve which edition to
-    // attach to. Prefer the monitored one - there is normally exactly one - and fall
-    // back to the first so a book with no monitored edition is still selectable.
-    const monitored = (editions || []).find((e) => e.monitored);
-    const edition = monitored || (editions || [])[0];
-
-    this.props.onBookSelect(id, edition ? edition.id : 0);
+    this.props.onBookSelect(this.props.id);
   };
 
   //
@@ -70,7 +59,6 @@ ChangeBookRow.propTypes = {
   title: PropTypes.string.isRequired,
   seriesTitle: PropTypes.string,
   releaseDate: PropTypes.string,
-  editions: PropTypes.arrayOf(PropTypes.object),
   isCurrent: PropTypes.bool,
   onBookSelect: PropTypes.func.isRequired
 };

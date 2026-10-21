@@ -118,6 +118,7 @@ class ChangeBookModalContent extends Component {
       currentBookId,
       pendingBook,
       noEditionBook,
+      hasResolveError,
       onBookSelect,
       onModalClose
     } = this.props;
@@ -165,6 +166,17 @@ class ChangeBookModalContent extends Component {
               null
           }
 
+          {
+            hasResolveError ?
+              <Alert
+                className={styles.error}
+                kind={kinds.DANGER}
+              >
+                {translate('ChangeBookFailed')}
+              </Alert> :
+              null
+          }
+
           <Scroller
             className={styles.scroller}
             autoFocus={false}
@@ -183,7 +195,6 @@ class ChangeBookModalContent extends Component {
                             title={item.title}
                             seriesTitle={item.seriesTitle}
                             releaseDate={item.releaseDate}
-                            editions={item.editions}
                             isCurrent={item.id === currentBookId}
                             onBookSelect={onBookSelect}
                           />
@@ -215,6 +226,7 @@ ChangeBookModalContent.propTypes = {
   currentBookId: PropTypes.number,
   pendingBook: PropTypes.object,
   noEditionBook: PropTypes.object,
+  hasResolveError: PropTypes.bool.isRequired,
   onBookSelect: PropTypes.func.isRequired,
   onConfirm: PropTypes.func.isRequired,
   onBack: PropTypes.func.isRequired,

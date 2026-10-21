@@ -4,6 +4,7 @@ import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
 import { fetchBooks } from 'Store/Actions/bookActions';
 import { updateBookFiles } from 'Store/Actions/bookFileActions';
+import createAjaxRequest from 'Utilities/createAjaxRequest';
 import ChangeBookModalContent from './ChangeBookModalContent';
 
 function createMapStateToProps() {
@@ -43,6 +44,8 @@ class ChangeBookModalContentConnector extends Component {
     this.state = {
       pending: null,
       noEditionBookId: null,
+      isResolving: false,
+      resolveError: false,
       hasSubmitted: false
     };
   }
@@ -70,16 +73,39 @@ class ChangeBookModalContentConnector extends Component {
   //
   // Listeners
 
-  onBookSelect = (bookId, editionId) => {
-    if (!editionId) {
-      this.setState({ noEditionBookId: bookId });
+  onBookSelect = (bookId) => {
+    if (this.state.isResolving) {
       return;
     }
 
-    this.setState({
-      pending: { bookId, editionId },
-      noEditionBookId: null,
-      hasSubmitted: false
+    this.setState({ isResolving: true, noEditionBookId: null, resolveError: false });
+
+    // A book's files hang off an edition, not the book, and the book list does not carry
+    // editions, so look them up. Prefer the monitored edition - there is normally exactly
+    // one - and fall back to the first so a book with no monitored edition is still usable.
+    const { request } = createAjaxRequest({
+      url: `/edition?bookId=${bookId}`,
+      method: 'GET',
+      dataType: 'json'
+    });
+
+    request.done((editions) => {
+      const edition = editions.find((e) => e.monitored) || editions[0];
+
+      if (!edition) {
+        this.setState({ isResolving: false, noEditionBookId: bookId });
+        return;
+      }
+
+      this.setState({
+        isResolving: false,
+        pending: { bookId, editionId: edition.id },
+        hasSubmitted: false
+      });
+    });
+
+    request.fail(() => {
+      this.setState({ isResolving: false, resolveError: true });
     });
   };
 
@@ -115,6 +141,7 @@ class ChangeBookModalContentConnector extends Component {
     const {
       pending,
       noEditionBookId,
+      resolveError,
       hasSubmitted
     } = this.state;
 
@@ -128,6 +155,7 @@ class ChangeBookModalContentConnector extends Component {
         currentBookId={currentBookId}
         pendingBook={pending ? items.find((book) => book.id === pending.bookId) : null}
         noEditionBook={noEditionBookId ? items.find((book) => book.id === noEditionBookId) : null}
+        hasResolveError={resolveError}
         onBookSelect={this.onBookSelect}
         onConfirm={this.onConfirm}
         onBack={this.onBack}
