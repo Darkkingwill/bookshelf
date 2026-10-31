@@ -390,6 +390,9 @@ namespace NzbDrone.Core.Test.MusicTests
                         It.IsAny<CommandPriority>(),
                         It.IsAny<CommandTrigger>()),
                     Times.Once);
+
+            // an author with no path yet makes the author-path update log a "Couldn't update author path" warning
+            ExceptionVerification.ExpectedWarns(1);
         }
     }
 }

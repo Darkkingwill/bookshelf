@@ -6,6 +6,7 @@ using NzbDrone.Core.Books;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Test.Framework;
+using NzbDrone.Test.Common;
 
 namespace NzbDrone.Core.Test.BookTests
 {
@@ -35,6 +36,9 @@ namespace NzbDrone.Core.Test.BookTests
 
             refresh.Should().NotThrow();
             refresh().Should().BeFalse();
+
+            // each of the two refresh() calls above logs one "Could not find book" error
+            ExceptionVerification.ExpectedErrors(2);
         }
     }
 }

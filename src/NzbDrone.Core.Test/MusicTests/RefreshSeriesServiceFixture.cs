@@ -5,6 +5,7 @@ using Moq;
 using NUnit.Framework;
 using NzbDrone.Core.Books;
 using NzbDrone.Core.Test.Framework;
+using NzbDrone.Test.Common;
 
 namespace NzbDrone.Core.Test.MusicTests
 {
@@ -47,6 +48,8 @@ namespace NzbDrone.Core.Test.MusicTests
 
             Mocker.GetMock<ISeriesService>()
                 .Verify(s => s.Delete(It.IsAny<int>()), Times.Never());
+
+            ExceptionVerification.ExpectedWarns(1);
         }
 
         [Test]

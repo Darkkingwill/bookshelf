@@ -5,6 +5,7 @@ using NUnit.Framework;
 using NzbDrone.Core.Books;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Test.Framework;
+using NzbDrone.Test.Common;
 
 namespace NzbDrone.Core.Test.BookTests
 {
@@ -23,6 +24,8 @@ namespace NzbDrone.Core.Test.BookTests
                 .Returns(new List<BookFile> { new BookFile { Id = 44419, Path = "/media/The Road.m4b" } });
 
             Subject.IsPinned(edition).Should().BeTrue();
+
+            ExceptionVerification.ExpectedWarns(1);
         }
 
         [Test]

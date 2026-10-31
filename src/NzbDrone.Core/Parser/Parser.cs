@@ -355,11 +355,18 @@ namespace NzbDrone.Core.Parser
 
                 simpleTitle = CleanTorrentSuffixRegex.Replace(simpleTitle);
 
+                // A book can have no monitored edition (or several) after a refresh or a manual add; throwing here
+                // would log an error and reject an otherwise matchable release, so fall back to its first edition.
                 var bestBook = books
-                    .OrderByDescending(x => simpleTitle.FuzzyMatch(x.Editions.Value.Single(x => x.Monitored).Title, wordDelimiters: WordDelimiters))
-                    .First()
-                    .Editions.Value
-                    .Single(x => x.Monitored);
+                    .Where(x => x.Editions.Value.Any())
+                    .Select(x => x.Editions.Value.FirstOrDefault(e => e.Monitored) ?? x.Editions.Value.First())
+                    .OrderByDescending(x => simpleTitle.FuzzyMatch(x.Title, wordDelimiters: WordDelimiters))
+                    .FirstOrDefault();
+
+                if (bestBook == null)
+                {
+                    return null;
+                }
 
                 var foundAuthor = GetTitleFuzzy(simpleTitle, authorName, out var remainder);
 

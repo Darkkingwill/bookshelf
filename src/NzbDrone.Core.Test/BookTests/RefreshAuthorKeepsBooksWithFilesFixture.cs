@@ -5,6 +5,7 @@ using NUnit.Framework;
 using NzbDrone.Core.Books;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Test.Framework;
+using NzbDrone.Test.Common;
 
 namespace NzbDrone.Core.Test.BookTests
 {
@@ -23,6 +24,8 @@ namespace NzbDrone.Core.Test.BookTests
                 .Returns(new List<BookFile> { new BookFile { Id = 1, Path = "/media/The Martian.m4b" } });
 
             Subject.IsPinned(book).Should().BeTrue();
+
+            ExceptionVerification.ExpectedWarns(1);
         }
 
         [Test]
