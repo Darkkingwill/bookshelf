@@ -16,7 +16,6 @@ using NzbDrone.Core.MediaFiles.Commands;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.RootFolders;
-using PdfSharpCore.Pdf.IO;
 using VersOne.Epub;
 using VersOne.Epub.Schema;
 
@@ -343,36 +342,19 @@ namespace NzbDrone.Core.MediaFiles
 
         private ParsedTrackInfo ReadPdf(string file)
         {
+            // The author and title used to come from the PDF's info dictionary via PdfSharpCore, which depends on a
+            // vulnerable ImageSharp. Bookshelf is audiobook-only now, so a PDF is recognised by its extension and
+            // matched by its folder and file name like any other file without tags.
             _logger.Trace($"Reading {file}");
-            var result = new ParsedTrackInfo
+
+            return new ParsedTrackInfo
             {
                 Quality = new QualityModel
                 {
                     Quality = Quality.PDF,
-                    QualityDetectionSource = QualityDetectionSource.TagLib
+                    QualityDetectionSource = QualityDetectionSource.Extension
                 }
             };
-
-            try
-            {
-                var book = PdfReader.Open(file, PdfDocumentOpenMode.InformationOnly);
-                if (book.Info != null)
-                {
-                    result.Authors = new List<string> { book.Info.Author };
-                    result.BookTitle = book.Info.Title;
-
-                    _logger.Trace(book.Info.ToJson());
-                }
-            }
-            catch (Exception e)
-            {
-                _logger.Error(e, "Error reading pdf");
-                result.Quality.QualityDetectionSource = QualityDetectionSource.Extension;
-            }
-
-            _logger.Trace($"Got:\n{result.ToJson()}");
-
-            return result;
         }
 
         public string GetIsbn(IEnumerable<EpubMetadataIdentifier> ids)
