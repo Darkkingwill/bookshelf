@@ -251,9 +251,13 @@ namespace NzbDrone.Core.Books
         {
             _logger.Warn($"Book {local} was merged with {remote} because the original was a duplicate.");
 
+            // Resolve the edition before touching anything: an EditionId of 0 would orphan the files, so a target
+            // with no editions at all must fail the merge rather than be written back.
+            var targetEdition = target.Editions.Value.GetMonitoredEdition() ?? throw new InvalidOperationException($"Book {target} has no editions to merge files into");
+
             // Update book ids for trackfiles
             var files = _mediaFileService.GetFilesByBook(local.Id);
-            files.ForEach(x => x.EditionId = target.Editions.Value.Single(e => e.Monitored).Id);
+            files.ForEach(x => x.EditionId = targetEdition.Id);
             _mediaFileService.Update(files);
 
             // Update book ids for history
