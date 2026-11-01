@@ -66,7 +66,8 @@ namespace NzbDrone.Core.Books
 
             // Note it's a manual addition so it's not deleted on next refresh
             book.AddOptions.AddType = BookAddType.Manual;
-            book.Editions.Value.Single(x => x.Monitored).ManualAdd = true;
+            var manualEdition = book.Editions.Value.GetMonitoredEdition() ?? throw new InvalidOperationException($"Book {book} has no editions to add");
+            manualEdition.ManualAdd = true;
 
             // Add the author if necessary. The book may have come from a different metadata
             // source than the author's existing library record (e.g. an import list using
@@ -172,7 +173,7 @@ namespace NzbDrone.Core.Books
 
         private Book AddSkyhookData(Book newBook, out SeriesBookLink seriesLink)
         {
-            var editionId = newBook.Editions.Value.Single(x => x.Monitored).ForeignEditionId;
+            var editionId = (newBook.Editions.Value.GetMonitoredEdition() ?? throw new InvalidOperationException($"Book {newBook} has no editions to look up")).ForeignEditionId;
 
             Tuple<string, Book, List<AuthorMetadata>> tuple = null;
             try
