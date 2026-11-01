@@ -6,6 +6,7 @@ import { toggleBooksMonitored } from 'Store/Actions/bookActions';
 import createBookSelector from 'Store/Selectors/createBookSelector';
 import createDimensionsSelector from 'Store/Selectors/createDimensionsSelector';
 import createUISettingsSelector from 'Store/Selectors/createUISettingsSelector';
+import getEstimatedLength from 'Utilities/Book/getEstimatedLength';
 import BookDetailsHeader from './BookDetailsHeader';
 
 const selectOverview = createSelector(
@@ -16,17 +17,25 @@ const selectOverview = createSelector(
   }
 );
 
+const selectEstimatedLength = createSelector(
+  (state) => state.bookFiles.items,
+  (state, { bookId }) => bookId,
+  (files, bookId) => getEstimatedLength(files.filter((file) => file.bookId === bookId))
+);
+
 function createMapStateToProps() {
   return createSelector(
     createBookSelector(),
     selectOverview,
+    selectEstimatedLength,
     createUISettingsSelector(),
     createDimensionsSelector(),
-    (book, overview, uiSettings, dimensions) => {
+    (book, overview, estimatedLength, uiSettings, dimensions) => {
 
       return {
         ...book,
         overview,
+        estimatedLength,
         shortDateFormat: uiSettings.shortDateFormat,
         isSmallScreen: dimensions.isSmallScreen
       };

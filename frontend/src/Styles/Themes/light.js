@@ -35,10 +35,10 @@ module.exports = {
   // Theme Colors
 
   themeRed: readarrRed,
-  themeAlternateRed: '#a41726',
-  themeDarkRed: '#66001a',
+  themeAlternateRed: '#4338ca',
+  themeDarkRed: '#312e81',
   themeDarkColor: '#353535',
-  themeLightColor: '#810020',
+  themeLightColor: '#5558e6',
   pageBackground: '#f5f7fa',
   pageFooterBackgroud: '#f1f1f1',
 
@@ -54,7 +54,7 @@ module.exports = {
   // Links
   defaultLinkHoverColor: '#fff',
   linkColor: '#5d9cec',
-  linkHoverColor: '#1b72e2',
+  linkHoverColor: '#4f52d9',
 
   // Header
   pageHeaderBackgroundColor: readarrRed,
@@ -62,14 +62,14 @@ module.exports = {
   // Sidebar
 
   sidebarColor: '#e1e2e3',
-  sidebarBackgroundColor: '#353535',
-  sidebarActiveBackgroundColor: '#252525',
+  sidebarBackgroundColor: '#1e2230',
+  sidebarActiveBackgroundColor: '#161a24',
 
   // Toolbar
   toolbarColor: '#e1e2e3',
-  toolbarBackgroundColor: '#810020',
-  toolbarMenuItemBackgroundColor: '#66001a',
-  toolbarMenuItemHoverBackgroundColor: '#353535',
+  toolbarBackgroundColor: '#3730a3',
+  toolbarMenuItemBackgroundColor: '#312e81',
+  toolbarMenuItemHoverBackgroundColor: '#1e2230',
   toolbarLabelColor: '#e1e2e3',
 
   // Accents
@@ -94,10 +94,10 @@ module.exports = {
   defaultHoverBackgroundColor: '#f5f5f5',
   defaultHoverBorderColor: '#d6d6d6',
 
-  primaryBackgroundColor: '#5d9cec',
-  primaryBorderColor: '#5899eb',
-  primaryHoverBackgroundColor: '#4b91ea',
-  primaryHoverBorderColor: '#3483e7',
+  primaryBackgroundColor: '#5558e6',
+  primaryBorderColor: '#4f52d9',
+  primaryHoverBackgroundColor: '#4a4dd3',
+  primaryHoverBorderColor: '#4144c4',
 
   successBackgroundColor: '#27c24c',
   successBorderColor: '#26be4a',
@@ -134,8 +134,8 @@ module.exports = {
   //
   // Toolbar
 
-  toobarButtonHoverColor: '#ca302d',
-  toobarButtonSelectedColor: '#ca302d',
+  toobarButtonHoverColor: '#c7d2fe',
+  toobarButtonSelectedColor: '#c7d2fe',
 
   //
   // Scroller

@@ -59,7 +59,7 @@ class BookDetailsHeader extends Component {
       titleSlug,
       title,
       seriesTitle,
-      pageCount,
+      estimatedLength,
       overview,
       statistics = {},
       monitored,
@@ -139,9 +139,9 @@ class BookDetailsHeader extends Component {
                 />
 
                 {
-                  !!pageCount &&
-                    <span className={styles.duration}>
-                      {`${pageCount} pages`}
+                  !!estimatedLength &&
+                    <span className={styles.duration} title="Estimated from file size and bitrate">
+                      {estimatedLength}
                     </span>
                 }
 
@@ -251,7 +251,7 @@ BookDetailsHeader.propTypes = {
   titleSlug: PropTypes.string.isRequired,
   title: PropTypes.string.isRequired,
   seriesTitle: PropTypes.string.isRequired,
-  pageCount: PropTypes.number,
+  estimatedLength: PropTypes.string,
   overview: PropTypes.string,
   statistics: PropTypes.object.isRequired,
   releaseDate: PropTypes.string.isRequired,
