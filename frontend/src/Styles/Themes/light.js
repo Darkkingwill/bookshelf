@@ -1,4 +1,5 @@
-const readarrRed = '#ca302d';
+// Bookshelf accent (named readarrRed because many stylesheets still read var(--readarrRed))
+const readarrRed = '#4f52d9';
 const darkGray = '#888';
 const gray = '#adadad';
 const black = '#000';

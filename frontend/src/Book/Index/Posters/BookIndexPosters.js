@@ -51,12 +51,13 @@ function calculateRowHeight(posterHeight, sortKey, isSmallScreen, posterOptions)
     isSmallScreen ? columnPaddingSmallScreen : columnPadding
   ];
 
+  // Must match .bookTitle (two clamped lines, always reserved) and .authorName in BookIndexPoster.css
   if (showTitle) {
-    heights.push(19);
+    heights.push(44);
   }
 
   if (showAuthor) {
-    heights.push(19);
+    heights.push(28);
   }
 
   if (showMonitored) {

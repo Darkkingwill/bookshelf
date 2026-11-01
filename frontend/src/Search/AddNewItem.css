@@ -1,25 +1,26 @@
 .searchContainer {
   display: flex;
   margin-bottom: 10px;
+  max-width: 900px;
 }
 
 .searchIconContainer {
   width: 58px;
-  height: 46px;
+  height: 52px;
   border: 1px solid var(--inputBorderColor);
   border-right: none;
-  border-radius: 4px;
+  border-radius: 12px;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
   background-color: var(--searchIconContainerBackgroundColor);
   text-align: center;
-  line-height: 46px;
+  line-height: 52px;
 }
 
 .searchInput {
   composes: input from '~Components/Form/TextInput.css';
 
-  height: 46px;
+  height: 52px;
   border-radius: 0;
   font-size: 18px;
 }
@@ -27,21 +28,30 @@
 .clearLookupButton {
   border: 1px solid var(--inputBorderColor);
   border-left: none;
-  border-top-right-radius: 4px;
-  border-bottom-right-radius: 4px;
-  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+  box-shadow: none;
 }
 
 .message {
-  margin-top: 30px;
+  margin-top: 70px;
   text-align: center;
-  font-weight: 300;
   font-size: $largeFontSize;
 }
 
 .helpText {
-  margin-bottom: 10px;
-  font-size: 24px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-size: 28px;
+}
+
+.helpSubText {
+  margin: 0 auto;
+  max-width: 520px;
+  color: var(--helpTextColor);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .noResults {

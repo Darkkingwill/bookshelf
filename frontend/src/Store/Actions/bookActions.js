@@ -225,7 +225,7 @@ export const defaultState = {
       name: 'series',
       label: 'Series',
       isSortable: true,
-      isVisible: false
+      isVisible: true
     },
     {
       name: 'releaseDate',
@@ -234,10 +234,17 @@ export const defaultState = {
       isVisible: true
     },
     {
+      // Estimated from file size and bitrate; there is no stored duration
+      name: 'length',
+      label: 'Length',
+      isSortable: false,
+      isVisible: true
+    },
+    {
       name: 'pageCount',
       label: 'Pages',
       isSortable: true,
-      isVisible: true
+      isVisible: false
     },
     {
       name: 'rating',

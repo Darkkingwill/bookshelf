@@ -5,17 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Chrome, Opera, and Firefox OS -->
-    <meta name="theme-color" content="#3a3f51" />
+    <meta name="theme-color" content="#14161c" />
     <!-- Windows Phone -->
-    <meta name="msapplication-navbutton-color" content="#3a3f51" />
+    <meta name="msapplication-navbutton-color" content="#14161c" />
     <!-- Android/Apple Phone -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="format-detection" content="telephone=no">
 
-    <meta name="description" content="Readarr">
+    <meta name="description" content="Bookshelf">
 
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/Content/Images/logo.svg" />
     <link
       rel="apple-touch-icon"
       sizes="180x180"
@@ -61,13 +62,20 @@
     <% for (key in htmlWebpackPlugin.files.js) { %><script type="text/javascript" src="<%= htmlWebpackPlugin.files.js[key] %>" data-no-hash></script><% } %>
     <% for (key in htmlWebpackPlugin.files.css) { %><link href="<%= htmlWebpackPlugin.files.css[key] %>" rel="stylesheet"></link><% } %>
 
-    <title>Readarr</title>
+    <title>Bookshelf</title>
 
     <!--
       The super basic styling for .root  will live here,
       saves fighting with CSS Modules for ~10 lines
     -->
     <style>
+      /* Match the dark theme before the app's own styles load, so there is no white flash on startup */
+      @media (prefers-color-scheme: dark) {
+        html, body {
+          background-color: #0e1014;
+        }
+      }
+
       .root {
         overflow: hidden;
         height: 100%; /* needed for proper layout */

@@ -35,14 +35,18 @@ export default function translate(
 
   const translation = translations[key] || key;
 
-  tokens.appName = 'Readarr';
+  tokens.appName = 'Bookshelf';
 
   // Fallback to the old behaviour for translations not yet updated to use named tokens
   Object.values(tokens).forEach((value, index) => {
     tokens[index] = value;
   });
 
-  return translation.replace(/\{([a-z0-9]+?)\}/gi, (match, tokenMatch) =>
-    String(tokens[tokenMatch] ?? match)
-  );
+  // The server's language files still say "Readarr" in about 50 strings; show the product's real name until those
+  // files are updated.
+  return translation
+    .replace(/\{([a-z0-9]+?)\}/gi, (match, tokenMatch) =>
+      String(tokens[tokenMatch] ?? match)
+    )
+    .replace(/Readarr/g, 'Bookshelf');
 }

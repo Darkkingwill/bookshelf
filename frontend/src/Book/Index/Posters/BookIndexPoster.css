@@ -1,16 +1,20 @@
 $hoverScale: 1.05;
 
 .content {
-  transition: all 200ms ease-in;
+  overflow: hidden;
+  border-radius: 10px;
+  background-color: var(--cardBackgroundColor);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 180ms ease, box-shadow 180ms ease;
 
   &:hover {
     z-index: 2;
-    box-shadow: 0 0 12px var(--black);
-    transition: all 200ms ease-in;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+    transform: translateY(-3px);
 
     .controls {
-      opacity: 0.9;
-      transition: opacity 200ms linear 150ms;
+      opacity: 0.95;
+      transition: opacity 200ms linear 100ms;
     }
   }
 }
@@ -56,6 +60,46 @@ $hoverScale: 1.05;
   font-size: $smallFontSize;
 }
 
+/* Heights here are mirrored in calculateRowHeight() in BookIndexPosters.js */
+.bookTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 8px 10px 0;
+  height: 44px;
+  background-color: var(--cardBackgroundColor);
+  color: var(--textColor);
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 18px;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.authorName {
+  @add-mixin truncate;
+
+  box-sizing: border-box;
+  padding: 0 10px 10px;
+  height: 28px;
+  background-color: var(--cardBackgroundColor);
+  color: var(--helpTextColor);
+  text-align: left;
+  font-size: $smallFontSize;
+  line-height: 18px;
+}
+
+.meta {
+  @add-mixin truncate;
+
+  padding: 0 10px 4px;
+  background-color: var(--cardBackgroundColor);
+  color: var(--dimColor);
+  text-align: left;
+  font-size: $extraSmallFontSize;
+}
+
 .title {
   @add-mixin truncate;
 
@@ -90,7 +134,7 @@ $hoverScale: 1.05;
   bottom: 10px;
   left: 10px;
   z-index: 3;
-  border-radius: 4px;
+  border-radius: 6px;
   background-color: var(--readarrRed);
   color: var(--white);
   font-size: $smallFontSize;
