@@ -34,6 +34,7 @@ namespace NzbDrone.Core.Configuration
         int MinimumFreeSpaceWhenImporting { get; set; }
         bool CopyUsingHardlinks { get; set; }
         bool AutoConvertToM4b { get; set; }
+        bool CoverFallbackEnabled { get; set; }
         bool ImportExtraFiles { get; set; }
         string ExtraFileExtensions { get; set; }
         bool WatchLibraryForChanges { get; set; }
