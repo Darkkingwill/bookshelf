@@ -12,7 +12,10 @@ using NzbDrone.Test.Common;
 
 namespace NzbDrone.Core.Test.MetadataSource.Goodreads
 {
+    // Every test here calls the public api.bookinfo.pro service, which is offline (HTTP 404), so the whole fixture is
+    // Explicit: run it on purpose when a live metadata server is available.
     [TestFixture]
+    [Explicit("api.bookinfo.pro is offline; needs a live metadata server")]
     public class GoodreadsProxySearchFixture : CoreTest<GoodreadsSearchProxy>
     {
         [SetUp]
