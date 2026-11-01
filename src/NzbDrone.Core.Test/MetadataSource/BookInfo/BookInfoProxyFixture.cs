@@ -13,6 +13,9 @@ using NzbDrone.Core.Test.Framework;
 
 namespace NzbDrone.Core.Test.MetadataSource.Goodreads
 {
+    // The detail and series tests below call the public api.bookinfo.pro service, which is offline (HTTP 404), so they
+    // are Explicit: run them on purpose when a live metadata server is available. The invalid-id tests pass either way
+    // and stay in the normal run.
     [TestFixture]
     public class BookInfoProxyFixture : CoreTest<BookInfoProxy>
     {
@@ -38,6 +41,7 @@ namespace NzbDrone.Core.Test.MetadataSource.Goodreads
                 .Returns("https://api.bookinfo.pro");
         }
 
+        [Explicit("api.bookinfo.pro is offline; needs a live metadata server")]
         [TestCase("1654", "Terry Pratchett")]
         [TestCase("575", "Robert Harris")]
         public void should_be_able_to_get_author_detail(string mbId, string name)
@@ -49,6 +53,7 @@ namespace NzbDrone.Core.Test.MetadataSource.Goodreads
             details.Name.Should().Be(name);
         }
 
+        [Explicit("api.bookinfo.pro is offline; needs a live metadata server")]
         [TestCase("1128601", "Guards! Guards!")]
         [TestCase("3293141", "The Iliad")]
         public void should_be_able_to_get_book_detail(string mbId, string name)
@@ -60,6 +65,7 @@ namespace NzbDrone.Core.Test.MetadataSource.Goodreads
             details.Item2.Title.Should().Be(name);
         }
 
+        [Explicit("api.bookinfo.pro is offline; needs a live metadata server")]
         [TestCase("14190696", "The Book of Dust", "1")]
         [TestCase("48427681", "October Daye Chronological Order", "7.1")]
         public void should_parse_series_from_title(string id, string series, string position)
