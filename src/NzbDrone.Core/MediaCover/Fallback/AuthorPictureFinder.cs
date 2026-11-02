@@ -8,6 +8,8 @@ namespace NzbDrone.Core.MediaCover.Fallback
 {
     public interface IAuthorPictureFinder
     {
+        // Null means every provider answered and none had a picture. Throws FallbackLookupUnavailableException when none had
+        // one but a provider could not answer, so the lookup is worth repeating.
         CoverFallbackResult Find(AuthorPictureSearch search);
     }
 
@@ -29,6 +31,8 @@ namespace NzbDrone.Core.MediaCover.Fallback
                 return null;
             }
 
+            Exception unavailable = null;
+
             foreach (var provider in _providers)
             {
                 try
@@ -44,7 +48,18 @@ namespace NzbDrone.Core.MediaCover.Fallback
                 {
                     // One provider being down or rate limited must not stop the next one from being tried.
                     _logger.Debug(ex, "Picture lookup via {0} failed for {1}", provider.Name, search.Name);
+
+                    if (unavailable == null && FallbackLookupUnavailableException.IsTransient(ex))
+                    {
+                        unavailable = ex;
+                    }
                 }
+            }
+
+            // Nothing matched, but a provider could not answer. That is not "no picture", so it must not be remembered as one.
+            if (unavailable != null)
+            {
+                throw new FallbackLookupUnavailableException($"The picture lookup for {search.Name} was incomplete: {unavailable.Message}", unavailable);
             }
 
             return null;

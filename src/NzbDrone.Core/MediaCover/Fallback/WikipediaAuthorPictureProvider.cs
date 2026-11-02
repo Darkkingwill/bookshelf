@@ -72,7 +72,9 @@ namespace NzbDrone.Core.MediaCover.Fallback
             {
                 AllowAutoRedirect = true,
                 RequestTimeout = TimeSpan.FromSeconds(20),
-                RateLimit = TimeSpan.FromMilliseconds(300)
+
+                // Wikipedia answered some requests with 429 when they came 300 ms apart.
+                RateLimit = TimeSpan.FromSeconds(1)
             };
             request.Headers.Accept = "application/json";
 

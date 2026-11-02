@@ -401,7 +401,19 @@ namespace NzbDrone.Core.MediaCover
             }
 
             var author = book.Author?.Value?.Name;
-            var found = _coverFallbackFinder.Find(new CoverSearch { Title = book.Title, Author = author, Isbn13 = edition.Isbn13 });
+            CoverFallbackResult found;
+
+            try
+            {
+                found = _coverFallbackFinder.Find(new CoverSearch { Title = book.Title, Author = author, Isbn13 = edition.Isbn13 });
+            }
+            catch (FallbackLookupUnavailableException ex)
+            {
+                // A source was rate limited or down, so "nothing found" is not an answer: leave no marker and ask again next time.
+                _logger.Info("The cover lookup for {0} was incomplete and will be repeated on the next run: {1}", book, ex.Message);
+
+                return false;
+            }
 
             if (found == null)
             {
@@ -491,7 +503,19 @@ namespace NzbDrone.Core.MediaCover
             }
 
             var titles = _bookService.GetBooksByAuthor(author.Id).Select(b => b.Title).Distinct().ToList();
-            var found = _authorPictureFinder.Find(new AuthorPictureSearch { Name = author.Name, BookTitles = titles });
+            CoverFallbackResult found;
+
+            try
+            {
+                found = _authorPictureFinder.Find(new AuthorPictureSearch { Name = author.Name, BookTitles = titles });
+            }
+            catch (FallbackLookupUnavailableException ex)
+            {
+                // A source was rate limited or down, so "nothing found" is not an answer: leave no marker and ask again next time.
+                _logger.Info("The picture lookup for {0} was incomplete and will be repeated on the next run: {1}", author, ex.Message);
+
+                return false;
+            }
 
             if (found == null)
             {

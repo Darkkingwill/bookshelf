@@ -164,6 +164,20 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
             Mocker.GetMock<IAuthorPictureFinder>().Verify(f => f.Find(It.IsAny<AuthorPictureSearch>()), Times.Once());
         }
 
+        // A rate limited source has not said "no picture", so nothing is remembered and the next run asks again.
+        [Test]
+        public void should_not_remember_a_lookup_that_a_source_could_not_answer()
+        {
+            Mocker.GetMock<IAuthorPictureFinder>()
+                  .Setup(f => f.Find(It.IsAny<AuthorPictureSearch>()))
+                  .Throws(new FallbackLookupUnavailableException("rate limited", new InvalidOperationException()));
+
+            Subject.FillMissingPicture(_author).Should().BeFalse();
+
+            Mocker.GetMock<IDiskProvider>().Verify(d => d.WriteAllText(It.Is<string>(p => p.EndsWith("picture.nofallback")), It.IsAny<string>()), Times.Never());
+            Mocker.GetMock<IHttpClient>().Verify(c => c.DownloadFile(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+        }
+
         [Test]
         public void should_look_again_after_a_month()
         {
