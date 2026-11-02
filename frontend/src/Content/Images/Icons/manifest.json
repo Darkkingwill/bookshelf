@@ -1,5 +1,5 @@
 {
-    "name": "Readarr",
+    "name": "Bookshelf",
     "icons": [
         {
             "src": "android-chrome-192x192.png",
@@ -13,7 +13,7 @@
         }
     ],
     "start_url": "../../../../",
-    "theme_color": "#3a3f51",
-    "background_color": "#3a3f51",
+    "theme_color": "#0e1014",
+    "background_color": "#0e1014",
     "display": "standalone"
 }

@@ -66,6 +66,7 @@ import {
   faHeart as fasHeart,
   faHistory as fasHistory,
   faHome as fasHome,
+  faImage as fasImage,
   faInfoCircle as fasInfoCircle,
   faLaptop as fasLaptop,
   faLevelUpAlt as fasLevelUpAlt,
@@ -165,6 +166,7 @@ export const HEART = fasHeart;
 export const HISTORY = fasHistory;
 export const HOUSEKEEPING = fasHome;
 export const IGNORE = fasTimesCircle;
+export const IMAGE = fasImage;
 export const INFO = fasInfoCircle;
 export const INTERACTIVE = fasUser;
 export const KEYBOARD = farKeyboard;
