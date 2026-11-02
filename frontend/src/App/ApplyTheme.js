@@ -31,6 +31,13 @@ function ApplyTheme({ theme, children }) {
         arrayOfVariableValues[index]
       );
     });
+
+    // index.ejs paints this before the styles load on the next visit
+    try {
+      localStorage.setItem('bookshelf.pageBackground', themes[theme].pageBackground);
+    } catch (e) {
+      // storage can be blocked; the next visit just starts on the default colour
+    }
   }, [theme]);
 
   // On Component Mount and Component Update

@@ -57,7 +57,7 @@ namespace NzbDrone.Core.Books
             }
 
             var targetEditions = _editionService.GetEditionsByBook(targetBookId);
-            var targetEdition = targetEditions.SingleOrDefault(e => e.Monitored) ?? targetEditions.First();
+            var targetEdition = targetEditions.GetMonitoredEdition() ?? throw new NzbDroneClientException(HttpStatusCode.BadRequest, "The book being merged into has no editions");
 
             var targetSeriesIds = _seriesBookLinkService.GetLinksByBook(new List<int> { targetBookId })
                 .Select(x => x.SeriesId)

@@ -59,7 +59,7 @@ namespace NzbDrone.Host
             services.Configure<ForwardedHeadersOptions>(options =>
             {
                 options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
-                options.KnownNetworks.Clear();
+                options.KnownIPNetworks.Clear();
                 options.KnownProxies.Clear();
             });
 
@@ -92,6 +92,12 @@ namespace NzbDrone.Host
             .AddJsonOptions(options =>
             {
                 STJson.ApplySerializerSettings(options.JsonSerializerOptions);
+            })
+            .ConfigureApiBehaviorOptions(options =>
+            {
+                // Since .NET 7 an action parameter whose type the container can resolve is injected instead of read from the body.
+                // DryIoc resolves any concrete class, so every resource would arrive empty.
+                options.DisableImplicitFromServicesParameters = true;
             })
             .AddControllersAsServices();
 

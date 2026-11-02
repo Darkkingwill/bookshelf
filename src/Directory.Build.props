@@ -204,4 +204,12 @@
     <_UsingDefaultRuntimeIdentifier>true</_UsingDefaultRuntimeIdentifier>
     <RuntimeIdentifier>osx-x64</RuntimeIdentifier>
   </PropertyGroup>
+  <!--
+       Before the .NET 8 SDK a runtime identifier made an app self-contained on its own. It no longer does, and the docker image
+       has no .NET runtime, so ask for it. Tests stay framework-dependent (see above).
+  -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' and '$(ReadarrOutputType)' != 'Test'">
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+
 </Project>

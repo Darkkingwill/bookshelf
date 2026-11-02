@@ -45,6 +45,34 @@ namespace NzbDrone.Core.MediaCover.Fallback
             });
         }
 
+        // A person's name is matched as written: the same words in any order ("Cixin Liu"), or an initial for a first name
+        // ("J. Smith"). Unlike a book's author there is no fuzzy matching, because "Jack Carr" and "Jack Karr" are two people.
+        public static bool SameAuthor(string localName, string candidateName)
+        {
+            var local = FuzzyMatcher.Normalize(localName);
+            var other = FuzzyMatcher.Normalize(candidateName);
+
+            return local.Length > 0 && other.Length > 0 && (local == other || SameNameInAnotherForm(local, other));
+        }
+
+        public static bool AnyTitleMatches(IEnumerable<string> localTitles, IEnumerable<string> candidateTitles)
+        {
+            var candidates = candidateTitles?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+
+            return candidates != null && candidates.Count > 0 && localTitles.Any(local => candidates.Any(c => TitlesMatch(local, c)));
+        }
+
+        // True when the text names at least one of the titles. A title of one short word ("Timeline", "Destiny") is
+        // ordinary prose, so only titles of two words or ten letters count as evidence that a page is about their author.
+        public static bool MentionsAnyTitle(string text, IEnumerable<string> titles)
+        {
+            var haystack = " " + FuzzyMatcher.Normalize(text) + " ";
+
+            return titles.SelectMany(TitleForms)
+                         .Where(form => form.Contains(' ') || form.Length >= 10)
+                         .Any(form => haystack.Contains(" " + form + " ", StringComparison.Ordinal));
+        }
+
         // The titles worth putting in a provider's search box: the title without "(1)" or "[Unabridged]" noise, then without a
         // trailing "Book One". Provider searches match words exactly, so "In Fury Born (1)" finds nothing but "In Fury Born"
         // does.

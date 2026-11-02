@@ -66,6 +66,49 @@ namespace NzbDrone.Core.Test.IndexerSearchTests
             return result;
         }
 
+        // A refresh or a manual add can leave a book with no monitored edition; the search must still run.
+        [Test]
+        public async Task should_search_on_the_first_edition_when_no_edition_is_monitored()
+        {
+            _firstBook.Editions.Value.ForEach(e =>
+            {
+                e.Monitored = false;
+                e.Title = "Edition Title";
+            });
+
+            var allCriteria = WatchForSearchCriteria();
+
+            await Subject.BookSearch(_firstBook, false, true, false);
+
+            allCriteria.OfType<BookSearchCriteria>().Single().BookTitle.Should().Be("Edition Title");
+        }
+
+        [Test]
+        public async Task should_search_on_the_book_title_when_the_book_has_no_editions()
+        {
+            _firstBook.Title = "Project Hail Mary";
+            _firstBook.Editions = new List<Edition>();
+
+            var allCriteria = WatchForSearchCriteria();
+
+            await Subject.BookSearch(_firstBook, false, true, false);
+
+            allCriteria.OfType<BookSearchCriteria>().Single().BookTitle.Should().Be("Project Hail Mary");
+        }
+
+        [Test]
+        public async Task should_search_on_the_first_monitored_edition_when_several_are_monitored()
+        {
+            _firstBook.Editions.Value.ForEach(e => e.Title = "First Edition Title");
+            _firstBook.Editions.Value.Add(new Edition { Title = "Second Edition Title", Monitored = true });
+
+            var allCriteria = WatchForSearchCriteria();
+
+            await Subject.BookSearch(_firstBook, false, true, false);
+
+            allCriteria.OfType<BookSearchCriteria>().Single().BookTitle.Should().Be("First Edition Title");
+        }
+
         [Test]
         public async Task Tags_IndexerTags_AuthorNoTags_IndexerNotIncluded()
         {

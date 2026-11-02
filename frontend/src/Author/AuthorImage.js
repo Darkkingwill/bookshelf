@@ -3,7 +3,15 @@ import React, { Component } from 'react';
 import LazyLoad from 'react-lazyload';
 
 function findImage(images, coverType) {
-  return images.find((image) => image.coverType === coverType);
+  const image = images.find((i) => i.coverType === coverType);
+
+  // Goodreads answers an author without a photo with a grey silhouette that clashes with the theme, so treat it as no image
+  // and let the caller show its own placeholder. A picture found elsewhere reports its own remote URL.
+  if (image && image.remoteUrl && image.remoteUrl.includes('/nophoto/')) {
+    return undefined;
+  }
+
+  return image;
 }
 
 function getUrl(image, coverType, size) {
