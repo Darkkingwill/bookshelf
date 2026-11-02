@@ -216,6 +216,14 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("AutoConvertToM4b", value); }
         }
 
+        // When a book has no usable cover, look one up on Audible, Open Library and (with a key) Google Books.
+        public bool CoverFallbackEnabled
+        {
+            get { return GetValueBoolean("CoverFallbackEnabled", true); }
+
+            set { SetValue("CoverFallbackEnabled", value); }
+        }
+
         public bool ImportExtraFiles
         {
             get { return GetValueBoolean("ImportExtraFiles", false); }

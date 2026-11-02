@@ -26,6 +26,7 @@ namespace Readarr.Api.V1.Config
         public int MinimumFreeSpaceWhenImporting { get; set; }
         public bool CopyUsingHardlinks { get; set; }
         public bool AutoConvertToM4b { get; set; }
+        public bool CoverFallbackEnabled { get; set; }
         public bool ImportExtraFiles { get; set; }
         public string ExtraFileExtensions { get; set; }
     }
@@ -55,6 +56,7 @@ namespace Readarr.Api.V1.Config
                 MinimumFreeSpaceWhenImporting = model.MinimumFreeSpaceWhenImporting,
                 CopyUsingHardlinks = model.CopyUsingHardlinks,
                 AutoConvertToM4b = model.AutoConvertToM4b,
+                CoverFallbackEnabled = model.CoverFallbackEnabled,
                 ImportExtraFiles = model.ImportExtraFiles,
                 ExtraFileExtensions = model.ExtraFileExtensions,
             };

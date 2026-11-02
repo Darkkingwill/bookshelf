@@ -12,6 +12,7 @@ using NzbDrone.Common.Http;
 using NzbDrone.Core.Books;
 using NzbDrone.Core.Books.Events;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.MediaCover.Fallback;
 using NzbDrone.Core.Messaging.Events;
 
 namespace NzbDrone.Core.MediaCover
@@ -23,13 +24,35 @@ namespace NzbDrone.Core.MediaCover
         void EnsureBookCovers(Book book);
     }
 
+    public interface IFillMissingCovers
+    {
+        // Looks up a cover for a book that has no usable one. Returns true only when a new cover was stored.
+        bool FillMissingCover(Book book);
+    }
+
     public class MediaCoverService :
         IHandleAsync<AuthorRefreshCompleteEvent>,
         IHandleAsync<AuthorDeletedEvent>,
         IHandleAsync<BookDeletedEvent>,
-        IMapCoversToLocal
+        IMapCoversToLocal,
+        IFillMissingCovers
     {
         private const string USER_AGENT = "Dalvik/2.1.0 (Linux; U; Android 10; SM-G975U Build/QP1A.190711.020)";
+
+        // A cover found by the fallback is stored next to the book's cover with this marker, so a later refresh does not
+        // download the metadata source's (missing or worse) cover over it.
+        private const string FALLBACK_MARKER = "cover.fallback";
+
+        // Remembers that no provider had a cover, so a refresh does not repeat the lookups for every such book.
+        private const string NO_FALLBACK_MARKER = "cover.nofallback";
+
+        // Real covers are tens of kilobytes; the placeholder thumbnails some sources return are a few.
+        private const long MIN_USABLE_COVER_BYTES = 6000;
+
+        private static readonly TimeSpan NoFallbackRetry = TimeSpan.FromDays(30);
+
+        // The extensions a stored book cover can have; the fallback writes .jpg, metadata sources also gave .jpeg and .png.
+        private static readonly string[] CoverExtensions = { ".jpg", ".jpeg", ".png" };
 
         private readonly IMediaCoverProxy _mediaCoverProxy;
         private readonly IImageResizer _resizer;
@@ -38,6 +61,8 @@ namespace NzbDrone.Core.MediaCover
         private readonly IDiskProvider _diskProvider;
         private readonly ICoverExistsSpecification _coverExistsSpecification;
         private readonly IConfigFileProvider _configFileProvider;
+        private readonly IConfigService _configService;
+        private readonly ICoverFallbackFinder _coverFallbackFinder;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
 
@@ -54,9 +79,13 @@ namespace NzbDrone.Core.MediaCover
                                  IAppFolderInfo appFolderInfo,
                                  ICoverExistsSpecification coverExistsSpecification,
                                  IConfigFileProvider configFileProvider,
+                                 IConfigService configService,
+                                 ICoverFallbackFinder coverFallbackFinder,
                                  IEventAggregator eventAggregator,
                                  Logger logger)
         {
+            _configService = configService;
+            _coverFallbackFinder = coverFallbackFinder;
             _mediaCoverProxy = mediaCoverProxy;
             _resizer = resizer;
             _bookService = bookService;
@@ -95,6 +124,21 @@ namespace NzbDrone.Core.MediaCover
             }
             else
             {
+                // A book whose metadata has no cover entry but has a stored fallback cover must still show it; without an
+                // entry the UI would never ask for the file.
+                if (coverEntity == MediaCoverEntity.Book &&
+                    covers is ICollection<MediaCover> coverList &&
+                    !coverList.IsReadOnly &&
+                    coverList.Count == 0)
+                {
+                    var stored = FindStoredBookCoverExtension(entityId);
+
+                    if (stored != null)
+                    {
+                        coverList.Add(new MediaCover(MediaCoverTypes.Cover, "cover" + stored));
+                    }
+                }
+
                 foreach (var mediaCover in covers)
                 {
                     if (mediaCover.CoverType == MediaCoverTypes.Unknown)
@@ -102,17 +146,28 @@ namespace NzbDrone.Core.MediaCover
                         continue;
                     }
 
-                    var filePath = GetCoverPath(entityId, coverEntity, mediaCover.CoverType, mediaCover.Extension, null);
+                    var extension = mediaCover.Extension;
+
+                    // A book whose source gave a cover entry without a usable URL ("null") has no extension, but the
+                    // fallback stores its cover as cover.jpg, so point the entry at whatever cover is stored.
+                    if (coverEntity == MediaCoverEntity.Book &&
+                        mediaCover.CoverType == MediaCoverTypes.Cover &&
+                        extension.IsNullOrWhiteSpace())
+                    {
+                        extension = FindStoredBookCoverExtension(entityId) ?? extension;
+                    }
+
+                    var filePath = GetCoverPath(entityId, coverEntity, mediaCover.CoverType, extension, null);
 
                     mediaCover.RemoteUrl = mediaCover.Url;
 
                     if (coverEntity == MediaCoverEntity.Book)
                     {
-                        mediaCover.Url = _configFileProvider.UrlBase + @"/MediaCover/Books/" + entityId + "/" + mediaCover.CoverType.ToString().ToLower() + GetExtension(mediaCover.CoverType, mediaCover.Extension);
+                        mediaCover.Url = _configFileProvider.UrlBase + @"/MediaCover/Books/" + entityId + "/" + mediaCover.CoverType.ToString().ToLower() + GetExtension(mediaCover.CoverType, extension);
                     }
                     else
                     {
-                        mediaCover.Url = _configFileProvider.UrlBase + @"/MediaCover/" + entityId + "/" + mediaCover.CoverType.ToString().ToLower() + GetExtension(mediaCover.CoverType, mediaCover.Extension);
+                        mediaCover.Url = _configFileProvider.UrlBase + @"/MediaCover/" + entityId + "/" + mediaCover.CoverType.ToString().ToLower() + GetExtension(mediaCover.CoverType, extension);
                     }
 
                     if (_diskProvider.FileExists(filePath))
@@ -206,6 +261,12 @@ namespace NzbDrone.Core.MediaCover
                 return;
             }
 
+            if (_diskProvider.FileExists(GetBookMarkerPath(book.Id, FALLBACK_MARKER)))
+            {
+                // A fallback cover is pinned to this book; the metadata source's cover must not replace it.
+                return;
+            }
+
             foreach (var cover in edition.Images.Where(e => e.CoverType == MediaCoverTypes.Cover))
             {
                 if (cover.CoverType == MediaCoverTypes.Unknown)
@@ -246,6 +307,134 @@ namespace NzbDrone.Core.MediaCover
                     _logger.Error(e, "Couldn't download media cover for {0}", book);
                 }
             }
+
+            FillMissingCover(book, edition);
+        }
+
+        public bool FillMissingCover(Book book)
+        {
+            var edition = book.Editions.Value.FirstOrDefault(x => x.Monitored);
+
+            return edition != null && FillMissingCover(book, edition);
+        }
+
+        private bool FillMissingCover(Book book, Edition edition)
+        {
+            if (!_configService.CoverFallbackEnabled)
+            {
+                return false;
+            }
+
+            // Store the cover where the book's own cover entry expects it, so the existing URL mapping picks it up.
+            var entry = edition.Images.FirstOrDefault(c => c.CoverType == MediaCoverTypes.Cover);
+            var extension = entry != null && entry.Extension.IsNotNullOrWhiteSpace() ? entry.Extension : ".jpg";
+            var target = GetCoverPath(book.Id, MediaCoverEntity.Book, MediaCoverTypes.Cover, extension, null);
+
+            if (IsUsableCover(target))
+            {
+                return false;
+            }
+
+            var skipMarker = GetBookMarkerPath(book.Id, NO_FALLBACK_MARKER);
+
+            if (_diskProvider.FileExists(skipMarker) && DateTime.UtcNow - _diskProvider.FileGetLastWrite(skipMarker).ToUniversalTime() < NoFallbackRetry)
+            {
+                return false;
+            }
+
+            var author = book.Author?.Value?.Name;
+            var found = _coverFallbackFinder.Find(new CoverSearch { Title = book.Title, Author = author, Isbn13 = edition.Isbn13 });
+
+            if (found == null)
+            {
+                _logger.Debug("No fallback cover found for {0}", book);
+                WriteMarker(skipMarker, "none");
+
+                return false;
+            }
+
+            try
+            {
+                _logger.Info("Using {0} cover for {1}: {2}", found.Source, book, found.Url);
+                _httpClient.DownloadFile(found.Url, target, USER_AGENT);
+
+                if (!LooksLikeAnImage(target) || _diskProvider.GetFileSize(target) < MIN_USABLE_COVER_BYTES)
+                {
+                    _logger.Debug("The {0} cover for {1} was not a usable image", found.Source, book);
+                    _diskProvider.DeleteFile(target);
+                    WriteMarker(skipMarker, "unusable " + found.Url);
+
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Couldn't download the {0} cover for {1}", found.Source, book);
+
+                if (_diskProvider.FileExists(target))
+                {
+                    _diskProvider.DeleteFile(target);
+                }
+
+                return false;
+            }
+
+            WriteMarker(GetBookMarkerPath(book.Id, FALLBACK_MARKER), found.Source + "\n" + found.Url);
+
+            if (_diskProvider.FileExists(skipMarker))
+            {
+                _diskProvider.DeleteFile(skipMarker);
+            }
+
+            return true;
+        }
+
+        private string FindStoredBookCoverExtension(int bookId)
+        {
+            return CoverExtensions.FirstOrDefault(e => _diskProvider.FileExists(GetCoverPath(bookId, MediaCoverEntity.Book, MediaCoverTypes.Cover, e, null)));
+        }
+
+        private bool IsUsableCover(string path)
+        {
+            return _diskProvider.FileExists(path) && _diskProvider.GetFileSize(path) >= MIN_USABLE_COVER_BYTES;
+        }
+
+        private string GetBookMarkerPath(int bookId, string marker)
+        {
+            return Path.Combine(GetBookCoverPath(bookId), marker);
+        }
+
+        private void WriteMarker(string path, string contents)
+        {
+            try
+            {
+                _diskProvider.EnsureFolder(Path.GetDirectoryName(path));
+                _diskProvider.WriteAllText(path, contents);
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Unable to write cover marker {0}", path);
+            }
+        }
+
+        // JPEG, PNG or WebP by their first bytes; an HTML error page saved as a cover is not an image.
+        private bool LooksLikeAnImage(string path)
+        {
+            var header = new byte[12];
+
+            using (var stream = _diskProvider.OpenReadStream(path))
+            {
+                if (stream.Read(header, 0, header.Length) < header.Length)
+                {
+                    return false;
+                }
+            }
+
+            var jpeg = header[0] == 0xFF && header[1] == 0xD8;
+            var png = header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47;
+            var webp = header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46 && header[8] == 0x57 && header[9] == 0x45;
+
+            return jpeg || png || webp;
         }
 
         private void DownloadCover(Author author, MediaCover cover, DateTime lastModified)
