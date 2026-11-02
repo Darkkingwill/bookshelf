@@ -7,6 +7,8 @@ namespace NzbDrone.Core.MediaCover.Fallback
 {
     public interface ICoverFallbackFinder
     {
+        // Null means every provider answered and none had a cover. Throws FallbackLookupUnavailableException when none had
+        // one but a provider could not answer, so the lookup is worth repeating.
         CoverFallbackResult Find(CoverSearch search);
     }
 
@@ -24,6 +26,7 @@ namespace NzbDrone.Core.MediaCover.Fallback
         public CoverFallbackResult Find(CoverSearch search)
         {
             var titles = CoverMatcher.SearchTitles(search.Title).ToList();
+            Exception unavailable = null;
 
             foreach (var provider in _providers)
             {
@@ -46,7 +49,18 @@ namespace NzbDrone.Core.MediaCover.Fallback
                 {
                     // One provider being down or rate limited must not stop the next one from being tried.
                     _logger.Debug(ex, "Cover lookup via {0} failed for {1}", provider.Name, search.Title);
+
+                    if (unavailable == null && FallbackLookupUnavailableException.IsTransient(ex))
+                    {
+                        unavailable = ex;
+                    }
                 }
+            }
+
+            // Nothing matched, but a provider could not answer. That is not "no cover", so it must not be remembered as one.
+            if (unavailable != null)
+            {
+                throw new FallbackLookupUnavailableException($"The cover lookup for {search.Title} was incomplete: {unavailable.Message}", unavailable);
             }
 
             return null;

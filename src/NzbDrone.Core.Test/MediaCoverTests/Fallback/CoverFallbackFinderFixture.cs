@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Common.Http;
 using NzbDrone.Core.MediaCover.Fallback;
 using NzbDrone.Core.Test.Framework;
 
@@ -65,6 +67,47 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
         public void should_return_null_when_no_provider_has_a_cover()
         {
             GivenProviders(GivenProvider("First", 0, null), GivenProvider("Second", 1, ""));
+
+            Subject.Find(Search).Should().BeNull();
+        }
+
+        private static HttpException GivenHttpFailure(HttpStatusCode statusCode)
+        {
+            var request = new HttpRequest("https://example.test/api");
+            var response = new HttpResponse(request, new HttpHeader(), string.Empty, statusCode);
+
+            return statusCode == HttpStatusCode.TooManyRequests ? new TooManyRequestsException(request, response) : new HttpException(request, response);
+        }
+
+        [TestCase(HttpStatusCode.TooManyRequests)]
+        [TestCase(HttpStatusCode.ServiceUnavailable)]
+        public void should_say_the_lookup_was_incomplete_when_a_provider_was_unavailable_and_none_matched(HttpStatusCode statusCode)
+        {
+            var limited = GivenProvider("Limited", 0, null);
+            limited.Setup(p => p.FindCoverUrl(It.IsAny<CoverSearch>())).Throws(GivenHttpFailure(statusCode));
+            GivenProviders(limited, GivenProvider("Second", 1, null));
+
+            Action act = () => Subject.Find(Search);
+
+            act.Should().Throw<FallbackLookupUnavailableException>();
+        }
+
+        [Test]
+        public void should_still_return_a_cover_when_another_provider_was_rate_limited()
+        {
+            var limited = GivenProvider("Limited", 0, null);
+            limited.Setup(p => p.FindCoverUrl(It.IsAny<CoverSearch>())).Throws(GivenHttpFailure(HttpStatusCode.TooManyRequests));
+            GivenProviders(limited, GivenProvider("Second", 1, "https://img/second.jpg"));
+
+            Subject.Find(Search).Source.Should().Be("Second");
+        }
+
+        [Test]
+        public void should_treat_a_client_error_as_no_cover()
+        {
+            var refusing = GivenProvider("Refusing", 0, null);
+            refusing.Setup(p => p.FindCoverUrl(It.IsAny<CoverSearch>())).Throws(GivenHttpFailure(HttpStatusCode.Forbidden));
+            GivenProviders(refusing, GivenProvider("Second", 1, null));
 
             Subject.Find(Search).Should().BeNull();
         }

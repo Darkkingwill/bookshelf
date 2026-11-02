@@ -181,6 +181,20 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
             Mocker.GetMock<IDiskProvider>().Verify(d => d.WriteAllText(It.Is<string>(p => p.EndsWith("cover.nofallback")), It.IsAny<string>()), Times.Once());
         }
 
+        // A rate limited source has not said "no cover", so nothing is remembered and the next run asks again.
+        [Test]
+        public void should_not_remember_a_lookup_that_a_source_could_not_answer()
+        {
+            Mocker.GetMock<ICoverFallbackFinder>()
+                  .Setup(f => f.Find(It.IsAny<CoverSearch>()))
+                  .Throws(new FallbackLookupUnavailableException("rate limited", new InvalidOperationException()));
+
+            Subject.FillMissingCover(_book).Should().BeFalse();
+
+            Mocker.GetMock<IDiskProvider>().Verify(d => d.WriteAllText(It.Is<string>(p => p.EndsWith("cover.nofallback")), It.IsAny<string>()), Times.Never());
+            Mocker.GetMock<IHttpClient>().Verify(c => c.DownloadFile(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+        }
+
         [Test]
         public void should_not_repeat_a_lookup_that_failed_yesterday()
         {
