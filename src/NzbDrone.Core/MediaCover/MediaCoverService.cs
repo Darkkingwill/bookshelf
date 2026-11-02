@@ -30,12 +30,20 @@ namespace NzbDrone.Core.MediaCover
         bool FillMissingCover(Book book);
     }
 
+    public interface IFillMissingAuthorPictures
+    {
+        // Looks up a picture for an author whose metadata source has none (or only its "no photo" silhouette). Returns true
+        // only when a picture was newly stored.
+        bool FillMissingPicture(Author author);
+    }
+
     public class MediaCoverService :
         IHandleAsync<AuthorRefreshCompleteEvent>,
         IHandleAsync<AuthorDeletedEvent>,
         IHandleAsync<BookDeletedEvent>,
         IMapCoversToLocal,
-        IFillMissingCovers
+        IFillMissingCovers,
+        IFillMissingAuthorPictures
     {
         private const string USER_AGENT = "Dalvik/2.1.0 (Linux; U; Android 10; SM-G975U Build/QP1A.190711.020)";
 
@@ -48,6 +56,15 @@ namespace NzbDrone.Core.MediaCover
 
         // Real covers are tens of kilobytes; the placeholder thumbnails some sources return are a few.
         private const long MIN_USABLE_COVER_BYTES = 6000;
+
+        // An author's picture found by the fallback is stored as poster.jpg beside the metadata source's own file, and pinned
+        // by this marker for as long as the source has only its "no photo" silhouette.
+        private const string PICTURE_FALLBACK_MARKER = "picture.fallback";
+        private const string NO_PICTURE_FALLBACK_MARKER = "picture.nofallback";
+        private const string FALLBACK_PICTURE_EXTENSION = ".jpg";
+
+        // Goodreads answers an author without a photo with the same grey silhouette; the URL says so.
+        private const string PLACEHOLDER_PICTURE_URL_PART = "/nophoto/";
 
         private static readonly TimeSpan NoFallbackRetry = TimeSpan.FromDays(30);
 
@@ -63,6 +80,7 @@ namespace NzbDrone.Core.MediaCover
         private readonly IConfigFileProvider _configFileProvider;
         private readonly IConfigService _configService;
         private readonly ICoverFallbackFinder _coverFallbackFinder;
+        private readonly IAuthorPictureFinder _authorPictureFinder;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
 
@@ -81,11 +99,13 @@ namespace NzbDrone.Core.MediaCover
                                  IConfigFileProvider configFileProvider,
                                  IConfigService configService,
                                  ICoverFallbackFinder coverFallbackFinder,
+                                 IAuthorPictureFinder authorPictureFinder,
                                  IEventAggregator eventAggregator,
                                  Logger logger)
         {
             _configService = configService;
             _coverFallbackFinder = coverFallbackFinder;
+            _authorPictureFinder = authorPictureFinder;
             _mediaCoverProxy = mediaCoverProxy;
             _resizer = resizer;
             _bookService = bookService;
@@ -157,9 +177,23 @@ namespace NzbDrone.Core.MediaCover
                         extension = FindStoredBookCoverExtension(entityId) ?? extension;
                     }
 
+                    // An author whose source has only its silhouette (or a picture that will not download) shows the picture found
+                    // elsewhere, stored as poster.jpg.
+                    var pinnedPicture = coverEntity == MediaCoverEntity.Author &&
+                                        mediaCover.CoverType == MediaCoverTypes.Poster &&
+                                        _diskProvider.FileExists(GetAuthorMarkerPath(entityId, PICTURE_FALLBACK_MARKER)) &&
+                                        (IsPlaceholderPicture(mediaCover.Url) || !_diskProvider.FileExists(GetCoverPath(entityId, coverEntity, mediaCover.CoverType, extension, null)));
+
+                    if (pinnedPicture)
+                    {
+                        extension = FALLBACK_PICTURE_EXTENSION;
+                    }
+
                     var filePath = GetCoverPath(entityId, coverEntity, mediaCover.CoverType, extension, null);
 
-                    mediaCover.RemoteUrl = mediaCover.Url;
+                    // The UI treats a remote URL that is the source's silhouette as "no picture", so a pinned picture must not
+                    // report it.
+                    mediaCover.RemoteUrl = pinnedPicture ? ReadPinnedPictureUrl(entityId) ?? mediaCover.Url : mediaCover.Url;
 
                     if (coverEntity == MediaCoverEntity.Book)
                     {
@@ -206,8 +240,17 @@ namespace NzbDrone.Core.MediaCover
                     continue;
                 }
 
+                var pinnedPicture = cover.CoverType == MediaCoverTypes.Poster && _diskProvider.FileExists(GetAuthorMarkerPath(author.Id, PICTURE_FALLBACK_MARKER));
+
+                if (pinnedPicture && IsPlaceholderPicture(cover.Url))
+                {
+                    // The source still has only its silhouette, so the picture found elsewhere stays.
+                    continue;
+                }
+
                 var fileName = GetCoverPath(author.Id, MediaCoverEntity.Author, cover.CoverType, cover.Extension);
                 var alreadyExists = false;
+                var downloaded = true;
 
                 try
                 {
@@ -222,15 +265,30 @@ namespace NzbDrone.Core.MediaCover
                 }
                 catch (HttpException e)
                 {
+                    downloaded = false;
                     _logger.Warn("Couldn't download media cover for {0}. {1}", author, e.Message);
                 }
                 catch (WebException e)
                 {
+                    downloaded = false;
                     _logger.Warn("Couldn't download media cover for {0}. {1}", author, e.Message);
                 }
                 catch (Exception e)
                 {
+                    downloaded = false;
                     _logger.Error(e, "Couldn't download media cover for {0}", author);
+                }
+
+                if (!downloaded && (pinnedPicture || !_diskProvider.FileExists(fileName)))
+                {
+                    // Nothing was downloaded, so there is nothing to resize; a pinned picture found elsewhere stays, with its sizes.
+                    continue;
+                }
+
+                if (pinnedPicture)
+                {
+                    // The source has a real picture now, which replaces the one found elsewhere.
+                    _diskProvider.DeleteFile(GetAuthorMarkerPath(author.Id, PICTURE_FALLBACK_MARKER));
                 }
 
                 toResize.Add(Tuple.Create(cover, alreadyExists));
@@ -387,6 +445,144 @@ namespace NzbDrone.Core.MediaCover
             }
 
             return true;
+        }
+
+        public bool FillMissingPicture(Author author)
+        {
+            if (!_configService.CoverFallbackEnabled)
+            {
+                return false;
+            }
+
+            var entry = author.Metadata.Value.Images.FirstOrDefault(c => c.CoverType == MediaCoverTypes.Poster);
+
+            if (entry != null && entry.Url.IsNotNullOrWhiteSpace() && entry.Url.IsValidUrl() && !IsPlaceholderPicture(entry.Url))
+            {
+                // The source has a real picture, so nothing is missing but a download that never happened.
+                var sourcePath = GetCoverPath(author.Id, MediaCoverEntity.Author, MediaCoverTypes.Poster, entry.Extension);
+
+                if (HasStoredPicture(sourcePath))
+                {
+                    return false;
+                }
+
+                EnsureAuthorCovers(author);
+
+                if (HasStoredPicture(sourcePath))
+                {
+                    return true;
+                }
+
+                // The source's picture will not download (a dead link), so look for one elsewhere.
+            }
+
+            var target = GetCoverPath(author.Id, MediaCoverEntity.Author, MediaCoverTypes.Poster, FALLBACK_PICTURE_EXTENSION);
+            var marker = GetAuthorMarkerPath(author.Id, PICTURE_FALLBACK_MARKER);
+            var skipMarker = GetAuthorMarkerPath(author.Id, NO_PICTURE_FALLBACK_MARKER);
+
+            if (_diskProvider.FileExists(marker) && IsUsableCover(target))
+            {
+                return false;
+            }
+
+            if (_diskProvider.FileExists(skipMarker) && DateTime.UtcNow - _diskProvider.FileGetLastWrite(skipMarker).ToUniversalTime() < NoFallbackRetry)
+            {
+                return false;
+            }
+
+            var titles = _bookService.GetBooksByAuthor(author.Id).Select(b => b.Title).Distinct().ToList();
+            var found = _authorPictureFinder.Find(new AuthorPictureSearch { Name = author.Name, BookTitles = titles });
+
+            if (found == null)
+            {
+                _logger.Debug("No fallback picture found for {0}", author);
+                WriteMarker(skipMarker, "none");
+
+                return false;
+            }
+
+            try
+            {
+                _logger.Info("Using {0} picture for {1}: {2}", found.Source, author, found.Url);
+
+                // Not USER_AGENT: that imitates an Android app, and Wikimedia wants an honest client name.
+                _httpClient.DownloadFile(found.Url, target);
+
+                if (!LooksLikeAnImage(target) || _diskProvider.GetFileSize(target) < MIN_USABLE_COVER_BYTES)
+                {
+                    _logger.Debug("The {0} picture for {1} was not a usable image", found.Source, author);
+                    _diskProvider.DeleteFile(target);
+                    WriteMarker(skipMarker, "unusable " + found.Url);
+
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Couldn't download the {0} picture for {1}", found.Source, author);
+
+                if (_diskProvider.FileExists(target))
+                {
+                    _diskProvider.DeleteFile(target);
+                }
+
+                return false;
+            }
+
+            WriteMarker(marker, found.Source + "\n" + found.Url);
+
+            if (_diskProvider.FileExists(skipMarker))
+            {
+                _diskProvider.DeleteFile(skipMarker);
+            }
+
+            ResizeFallbackPicture(author);
+
+            return true;
+        }
+
+        private bool HasStoredPicture(string path)
+        {
+            return _diskProvider.FileExists(path) && _diskProvider.GetFileSize(path) > 0;
+        }
+
+        private void ResizeFallbackPicture(Author author)
+        {
+            try
+            {
+                _semaphore.Wait();
+
+                EnsureResizedCovers(author, new MediaCover(MediaCoverTypes.Poster, "poster" + FALLBACK_PICTURE_EXTENSION), true);
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        // The marker holds the source's name on its first line and the picture's URL on its second.
+        private string ReadPinnedPictureUrl(int authorId)
+        {
+            try
+            {
+                return _diskProvider.ReadAllText(GetAuthorMarkerPath(authorId, PICTURE_FALLBACK_MARKER))?.Split('\n').ElementAtOrDefault(1)?.Trim();
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Unable to read the picture marker of author {0}", authorId);
+
+                return null;
+            }
+        }
+
+        private static bool IsPlaceholderPicture(string url)
+        {
+            return url.IsNotNullOrWhiteSpace() && url.Contains(PLACEHOLDER_PICTURE_URL_PART, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string GetAuthorMarkerPath(int authorId, string marker)
+        {
+            return Path.Combine(GetAuthorCoverPath(authorId), marker);
         }
 
         private string FindStoredBookCoverExtension(int bookId)

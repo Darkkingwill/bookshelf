@@ -18,6 +18,7 @@ function createMapStateToProps() {
     createAuthorClientSideCollectionItemsSelector('authorIndex'),
     createCommandExecutingSelector(commandNames.BULK_REFRESH_AUTHOR),
     createCommandExecutingSelector(commandNames.RSS_SYNC),
+    createCommandExecutingSelector(commandNames.FIND_MISSING_COVERS),
     createCommandExecutingSelector(commandNames.RENAME_AUTHOR),
     createCommandExecutingSelector(commandNames.RETAG_AUTHOR),
     createDimensionsSelector(),
@@ -25,6 +26,7 @@ function createMapStateToProps() {
       author,
       isRefreshingAuthor,
       isRssSyncExecuting,
+      isFindingCovers,
       isOrganizingAuthor,
       isRetaggingAuthor,
       dimensionsState
@@ -33,6 +35,7 @@ function createMapStateToProps() {
         ...author,
         isRefreshingAuthor,
         isRssSyncExecuting,
+        isFindingCovers,
         isOrganizingAuthor,
         isRetaggingAuthor,
         isSmallScreen: dimensionsState.isSmallScreen
@@ -73,6 +76,12 @@ function createMapDispatchToProps(dispatch, props) {
     onRssSyncPress() {
       dispatch(executeCommand({
         name: commandNames.RSS_SYNC
+      }));
+    },
+
+    onFindCoversPress() {
+      dispatch(executeCommand({
+        name: commandNames.FIND_MISSING_COVERS
       }));
     }
   };
