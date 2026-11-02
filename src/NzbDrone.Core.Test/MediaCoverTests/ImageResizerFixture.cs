@@ -117,7 +117,7 @@ namespace NzbDrone.Core.Test.MediaCoverTests
             var header = new byte[24];
             using (var stream = File.OpenRead(resizedFile))
             {
-                stream.Read(header, 0, header.Length);
+                stream.ReadExactly(header, 0, header.Length);
             }
 
             var width = (header[16] << 24) | (header[17] << 16) | (header[18] << 8) | header[19];
