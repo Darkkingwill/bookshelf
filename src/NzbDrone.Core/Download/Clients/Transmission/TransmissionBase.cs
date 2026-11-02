@@ -80,8 +80,9 @@ namespace NzbDrone.Core.Download.Clients.Transmission
                     {
                         item.RemainingTime = TimeSpan.FromSeconds(torrent.Eta);
                     }
-                    catch (OverflowException)
+                    catch (Exception ex) when (ex is OverflowException or ArgumentOutOfRangeException)
                     {
+                        // FromSeconds(long) throws ArgumentOutOfRangeException where FromSeconds(double) used to throw OverflowException
                         item.RemainingTime = TimeSpan.FromMilliseconds(torrent.Eta);
                     }
                 }
