@@ -175,7 +175,7 @@ namespace Readarr.Api.V1.Books
             _bookService.UpdateBook(model);
             _editionService.UpdateMany(model.Editions.Value);
 
-            var newEdition = model.Editions.Value.SingleOrDefault(e => e.Monitored);
+            var newEdition = model.Editions.Value.FirstOrDefault(e => e.Monitored);
 
             if (newEdition != null)
             {
