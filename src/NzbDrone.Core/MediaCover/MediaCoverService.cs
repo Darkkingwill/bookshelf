@@ -177,11 +177,12 @@ namespace NzbDrone.Core.MediaCover
                         extension = FindStoredBookCoverExtension(entityId) ?? extension;
                     }
 
-                    // An author whose source has only its silhouette shows the picture found elsewhere, stored as poster.jpg.
+                    // An author whose source has only its silhouette (or a picture that will not download) shows the picture found
+                    // elsewhere, stored as poster.jpg.
                     var pinnedPicture = coverEntity == MediaCoverEntity.Author &&
                                         mediaCover.CoverType == MediaCoverTypes.Poster &&
-                                        IsPlaceholderPicture(mediaCover.Url) &&
-                                        _diskProvider.FileExists(GetAuthorMarkerPath(entityId, PICTURE_FALLBACK_MARKER));
+                                        _diskProvider.FileExists(GetAuthorMarkerPath(entityId, PICTURE_FALLBACK_MARKER)) &&
+                                        (IsPlaceholderPicture(mediaCover.Url) || !_diskProvider.FileExists(GetCoverPath(entityId, coverEntity, mediaCover.CoverType, extension, null)));
 
                     if (pinnedPicture)
                     {
@@ -239,20 +240,17 @@ namespace NzbDrone.Core.MediaCover
                     continue;
                 }
 
-                if (cover.CoverType == MediaCoverTypes.Poster && _diskProvider.FileExists(GetAuthorMarkerPath(author.Id, PICTURE_FALLBACK_MARKER)))
-                {
-                    if (IsPlaceholderPicture(cover.Url))
-                    {
-                        // The source still has only its silhouette, so the picture found elsewhere stays.
-                        continue;
-                    }
+                var pinnedPicture = cover.CoverType == MediaCoverTypes.Poster && _diskProvider.FileExists(GetAuthorMarkerPath(author.Id, PICTURE_FALLBACK_MARKER));
 
-                    // The source has a real picture now, which replaces the one found elsewhere.
-                    _diskProvider.DeleteFile(GetAuthorMarkerPath(author.Id, PICTURE_FALLBACK_MARKER));
+                if (pinnedPicture && IsPlaceholderPicture(cover.Url))
+                {
+                    // The source still has only its silhouette, so the picture found elsewhere stays.
+                    continue;
                 }
 
                 var fileName = GetCoverPath(author.Id, MediaCoverEntity.Author, cover.CoverType, cover.Extension);
                 var alreadyExists = false;
+                var downloaded = true;
 
                 try
                 {
@@ -267,15 +265,30 @@ namespace NzbDrone.Core.MediaCover
                 }
                 catch (HttpException e)
                 {
+                    downloaded = false;
                     _logger.Warn("Couldn't download media cover for {0}. {1}", author, e.Message);
                 }
                 catch (WebException e)
                 {
+                    downloaded = false;
                     _logger.Warn("Couldn't download media cover for {0}. {1}", author, e.Message);
                 }
                 catch (Exception e)
                 {
+                    downloaded = false;
                     _logger.Error(e, "Couldn't download media cover for {0}", author);
+                }
+
+                if (!downloaded && (pinnedPicture || !_diskProvider.FileExists(fileName)))
+                {
+                    // Nothing was downloaded, so there is nothing to resize; a pinned picture found elsewhere stays, with its sizes.
+                    continue;
+                }
+
+                if (pinnedPicture)
+                {
+                    // The source has a real picture now, which replaces the one found elsewhere.
+                    _diskProvider.DeleteFile(GetAuthorMarkerPath(author.Id, PICTURE_FALLBACK_MARKER));
                 }
 
                 toResize.Add(Tuple.Create(cover, alreadyExists));
@@ -446,7 +459,21 @@ namespace NzbDrone.Core.MediaCover
             if (entry != null && entry.Url.IsNotNullOrWhiteSpace() && entry.Url.IsValidUrl() && !IsPlaceholderPicture(entry.Url))
             {
                 // The source has a real picture, so nothing is missing but a download that never happened.
-                return FillSourcePicture(author);
+                var sourcePath = GetCoverPath(author.Id, MediaCoverEntity.Author, MediaCoverTypes.Poster, entry.Extension);
+
+                if (HasStoredPicture(sourcePath))
+                {
+                    return false;
+                }
+
+                EnsureAuthorCovers(author);
+
+                if (HasStoredPicture(sourcePath))
+                {
+                    return true;
+                }
+
+                // The source's picture will not download (a dead link), so look for one elsewhere.
             }
 
             var target = GetCoverPath(author.Id, MediaCoverEntity.Author, MediaCoverTypes.Poster, FALLBACK_PICTURE_EXTENSION);
@@ -514,18 +541,8 @@ namespace NzbDrone.Core.MediaCover
             return true;
         }
 
-        private bool FillSourcePicture(Author author)
+        private bool HasStoredPicture(string path)
         {
-            var poster = author.Metadata.Value.Images.First(c => c.CoverType == MediaCoverTypes.Poster);
-            var path = GetCoverPath(author.Id, MediaCoverEntity.Author, MediaCoverTypes.Poster, poster.Extension);
-
-            if (_diskProvider.FileExists(path) && _diskProvider.GetFileSize(path) > 0)
-            {
-                return false;
-            }
-
-            EnsureAuthorCovers(author);
-
             return _diskProvider.FileExists(path) && _diskProvider.GetFileSize(path) > 0;
         }
 

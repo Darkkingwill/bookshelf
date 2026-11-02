@@ -208,12 +208,66 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
         [Test]
         public void should_download_the_sources_own_picture_instead_when_it_has_one_that_never_arrived()
         {
-            GivenSourcePicture(RealPhoto);
+            var downloaded = false;
 
-            Subject.FillMissingPicture(_author);
+            GivenSourcePicture(RealPhoto);
+            GivenFileExists(p => downloaded && p.EndsWith(Poster(".jpg")));
+            Mocker.GetMock<IHttpClient>()
+                  .Setup(c => c.DownloadFile(RealPhoto, It.IsAny<string>(), It.IsAny<string>()))
+                  .Callback(() => downloaded = true);
+
+            Subject.FillMissingPicture(_author).Should().BeTrue();
 
             Mocker.GetMock<IAuthorPictureFinder>().Verify(f => f.Find(It.IsAny<AuthorPictureSearch>()), Times.Never());
             Mocker.GetMock<IHttpClient>().Verify(c => c.DownloadFile(RealPhoto, It.Is<string>(p => p.EndsWith(Poster(".jpg"))), It.IsAny<string>()), Times.Once());
+        }
+
+        // Some Goodreads photo links are dead; the author should not stay blank when Wikipedia or Open Library has a picture.
+        [Test]
+        public void should_look_elsewhere_when_the_sources_own_picture_will_not_download()
+        {
+            GivenSourcePicture(RealPhoto);
+            Mocker.GetMock<IHttpClient>()
+                  .Setup(c => c.DownloadFile(RealPhoto, It.IsAny<string>(), It.IsAny<string>()))
+                  .Throws(new System.Net.WebException("404"));
+
+            Subject.FillMissingPicture(_author).Should().BeTrue();
+
+            Mocker.GetMock<IAuthorPictureFinder>().Verify(f => f.Find(It.IsAny<AuthorPictureSearch>()), Times.Once());
+            Mocker.GetMock<IDiskProvider>().Verify(d => d.WriteAllText(It.Is<string>(p => p.EndsWith("picture.fallback")), It.IsAny<string>()), Times.Once());
+            NzbDrone.Test.Common.ExceptionVerification.ExpectedWarns(1);
+        }
+
+        [Test]
+        public void should_show_the_found_picture_for_an_author_whose_source_picture_will_not_download()
+        {
+            var covers = new List<MediaCover.MediaCover> { new MediaCover.MediaCover(MediaCoverTypes.Poster, "https://example.org/photo.png") };
+
+            GivenFileExists(p => p.EndsWith("picture.fallback") || p.EndsWith(Poster(".jpg")));
+            Mocker.GetMock<IDiskProvider>().Setup(d => d.FileGetLastWrite(It.IsAny<string>())).Returns(new DateTime(1234));
+            Mocker.GetMock<IDiskProvider>().Setup(d => d.ReadAllText(It.IsAny<string>())).Returns("Wikipedia" + (char)10 + FoundUrl);
+
+            Subject.ConvertToLocalUrls(2, MediaCoverEntity.Author, covers);
+
+            covers.Single().Url.Should().Be("/MediaCover/2/poster.jpg?lastWrite=1234");
+            covers.Single().RemoteUrl.Should().Be(FoundUrl);
+        }
+
+        [Test]
+        public void should_keep_the_pinned_picture_when_a_refresh_cannot_download_the_sources_picture()
+        {
+            GivenSourcePicture(RealPhoto);
+            GivenFileExists(p => p.EndsWith("picture.fallback") || p.EndsWith(Poster(".jpg")));
+            Mocker.GetMock<IBookService>().Setup(s => s.GetBooksByAuthor(2)).Returns(new List<Book>());
+            Mocker.GetMock<IHttpClient>()
+                  .Setup(c => c.DownloadFile(RealPhoto, It.IsAny<string>(), It.IsAny<string>()))
+                  .Throws(new System.Net.WebException("404"));
+
+            Subject.HandleAsync(new AuthorRefreshCompleteEvent(_author));
+
+            Mocker.GetMock<IDiskProvider>().Verify(d => d.DeleteFile(It.Is<string>(p => p.EndsWith("picture.fallback"))), Times.Never());
+            Mocker.GetMock<IImageResizer>().Verify(r => r.Resize(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never());
+            NzbDrone.Test.Common.ExceptionVerification.ExpectedWarns(1);
         }
 
         [Test]
