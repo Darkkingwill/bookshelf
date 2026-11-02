@@ -139,10 +139,10 @@ class AuthorIndexPosters extends Component {
             prevState.columnWidth !== columnWidth ||
             prevState.columnCount !== columnCount ||
             prevState.rowHeight !== rowHeight ||
-            hasDifferentItemsOrOrder(prevProps.items, items)) ||
+            hasDifferentItemsOrOrder(prevProps.items, items) ||
             prevProps.isEditorActive !== isEditorActive ||
             prevProps.selectedState !== selectedState ||
-            prevProps.posterOptions.showTitle !== posterOptions.showTitle) {
+            prevProps.posterOptions.showTitle !== posterOptions.showTitle)) {
       // recomputeGridSize also forces Grid to discard its cache of rendered cells
       this._grid.recomputeGridSize();
     }
