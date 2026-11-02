@@ -48,11 +48,6 @@ export default {
     isPopulated: false,
     error: null,
     schema: {
-      isCalibreLibrary: false,
-      host: 'localhost',
-      port: 8080,
-      useSsl: false,
-      outputProfile: 'default',
       defaultQualityProfileId: 0,
       defaultMetadataProfileId: 0,
       defaultMonitorOption: monitorOptions[0].key,

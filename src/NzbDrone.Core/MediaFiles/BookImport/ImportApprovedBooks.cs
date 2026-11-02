@@ -8,7 +8,6 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.Books;
-using NzbDrone.Core.Books.Calibre;
 using NzbDrone.Core.Books.Commands;
 using NzbDrone.Core.Books.Events;
 using NzbDrone.Core.DecisionEngine;
@@ -183,7 +182,6 @@ namespace NzbDrone.Core.MediaFiles.BookImport
                     var bookFile = new BookFile
                     {
                         Path = localTrack.Path.CleanFilePath(),
-                        CalibreId = localTrack.CalibreId,
                         Part = localTrack.Part,
                         PartCount = localTrack.PartCount,
                         Size = localTrack.Size,
@@ -243,11 +241,6 @@ namespace NzbDrone.Core.MediaFiles.BookImport
                         if (previousFile != null)
                         {
                             _mediaFileService.Delete(previousFile, DeleteMediaFileReason.ManualOverride);
-
-                            if (bookFile.CalibreId == 0 && previousFile.CalibreId != 0)
-                            {
-                                bookFile.CalibreId = previousFile.CalibreId;
-                            }
                         }
 
                         _metadataTagService.WriteTags(bookFile, false);
@@ -293,12 +286,6 @@ namespace NzbDrone.Core.MediaFiles.BookImport
                     _eventAggregator.PublishEvent(new TrackImportFailedEvent(e, localTrack, !localTrack.ExistingFile, downloadClientItem));
 
                     importResults.Add(new ImportResult(importDecision, "Failed to import book, unable to move existing file to the Recycle Bin."));
-                }
-                catch (CalibreException e)
-                {
-                    _logger.Warn(e, "Couldn't import book " + localTrack);
-
-                    importResults.Add(new ImportResult(importDecision, "Failed to import book, error communicating with Calibre.  Check log for details."));
                 }
                 catch (Exception e)
                 {
@@ -400,12 +387,6 @@ namespace NzbDrone.Core.MediaFiles.BookImport
                         Monitored = author.Monitored,
                         Monitor = rootFolder.DefaultMonitorOption
                     };
-
-                    if (rootFolder.IsCalibreLibrary)
-                    {
-                        // calibre has author / book / files
-                        author.Path = path.GetParentPath().GetParentPath();
-                    }
 
                     try
                     {

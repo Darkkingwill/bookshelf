@@ -53,7 +53,6 @@ namespace NzbDrone.Core.Test.MediaFiles
             book.Editions = new List<Edition> { edition };
 
             var rootFolder = Builder<RootFolder>.CreateNew()
-                .With(r => r.IsCalibreLibrary = false)
                 .Build();
 
             _rejectedDecisions.Add(new ImportDecision<LocalBook>(new LocalBook(), new Rejection("Rejected!")));

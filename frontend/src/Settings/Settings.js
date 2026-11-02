@@ -110,7 +110,7 @@ function Settings() {
         </Link>
 
         <div className={styles.summary}>
-          Configure metadata providers, Calibre integration, and API keys
+          Configure metadata providers and API keys
         </div>
 
         <Link

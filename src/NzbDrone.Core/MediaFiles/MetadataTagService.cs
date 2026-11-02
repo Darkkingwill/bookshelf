@@ -23,15 +23,12 @@ namespace NzbDrone.Core.MediaFiles
         IExecute<RetagAuthorCommand>
     {
         private readonly IAudioTagService _audioTagService;
-        private readonly IEBookTagService _eBookTagService;
         private readonly Logger _logger;
 
         public MetadataTagService(IAudioTagService audioTagService,
-            IEBookTagService eBookTagService,
             Logger logger)
         {
             _audioTagService = audioTagService;
-            _eBookTagService = eBookTagService;
 
             _logger = logger;
         }
@@ -42,10 +39,9 @@ namespace NzbDrone.Core.MediaFiles
             {
                 return _audioTagService.ReadTags(file.FullName);
             }
-            else
-            {
-                return _eBookTagService.ReadTags(file);
-            }
+
+            // Only audio files carry tags Bookshelf reads; anything else is identified by its file name.
+            return Parser.Parser.ParseTitle(file.FullName);
         }
 
         public void WriteTags(BookFile bookFile, bool newDownload, bool force = false)
@@ -55,43 +51,30 @@ namespace NzbDrone.Core.MediaFiles
             {
                 _audioTagService.WriteTags(bookFile, newDownload, force);
             }
-            else if (bookFile.CalibreId > 0)
-            {
-                _eBookTagService.WriteTags(bookFile, newDownload, force);
-            }
         }
 
         public void SyncTags(List<Edition> editions)
         {
             _audioTagService.SyncTags(editions);
-            _eBookTagService.SyncTags(editions);
         }
 
         public List<RetagBookFilePreview> GetRetagPreviewsByAuthor(int authorId)
         {
-            var previews = _audioTagService.GetRetagPreviewsByAuthor(authorId);
-            previews.AddRange(_eBookTagService.GetRetagPreviewsByAuthor(authorId));
-
-            return previews;
+            return _audioTagService.GetRetagPreviewsByAuthor(authorId);
         }
 
         public List<RetagBookFilePreview> GetRetagPreviewsByBook(int bookId)
         {
-            var previews = _audioTagService.GetRetagPreviewsByBook(bookId);
-            previews.AddRange(_eBookTagService.GetRetagPreviewsByBook(bookId));
-
-            return previews;
+            return _audioTagService.GetRetagPreviewsByBook(bookId);
         }
 
         public void Execute(RetagFilesCommand message)
         {
-            _eBookTagService.RetagFiles(message);
             _audioTagService.RetagFiles(message);
         }
 
         public void Execute(RetagAuthorCommand message)
         {
-            _eBookTagService.RetagAuthor(message);
             _audioTagService.RetagAuthor(message);
         }
     }

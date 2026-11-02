@@ -74,9 +74,6 @@ namespace NzbDrone.Core.Configuration
         void SaveMetadataProviderConfigs(List<MetadataProviderConfig> configs);
         WriteAudioTagsType WriteAudioTags { get; set; }
         bool ScrubAudioTags { get; set; }
-        WriteBookTagsType WriteBookTags { get; set; }
-        bool UpdateCovers { get; set; }
-        bool EmbedMetadata { get; set; }
 
         //Forms Auth
         string RijndaelPassphrase { get; }

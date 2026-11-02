@@ -26,7 +26,6 @@ namespace NzbDrone.Core.Test.MediaFiles
             _trackFiles = Builder<BookFile>.CreateListOfSize(2)
                                                 .All()
                                                 .With(e => e.Author = _author)
-                                                .With(e => e.CalibreId = 0)
                                                 .Build()
                                                 .ToList();
 

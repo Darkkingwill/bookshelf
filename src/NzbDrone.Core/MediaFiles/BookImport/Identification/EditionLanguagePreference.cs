@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Books;
-using NzbDrone.Core.Books.Calibre;
+using NzbDrone.Core.Languages;
 using NzbDrone.Core.Profiles.Metadata;
 
 namespace NzbDrone.Core.MediaFiles.BookImport.Identification
