@@ -57,6 +57,19 @@
       window.Readarr = {
         urlBase: '__URL_BASE__'
       };
+
+      // Paint the page background of the theme used last time before the app's styles load, so there is no flash of the
+      // wrong colour on startup. On the very first visit, follow the system setting (the default theme does).
+      try {
+        var pageBackground = localStorage.getItem('bookshelf.pageBackground') ||
+          (window.matchMedia('(prefers-color-scheme: dark)').matches ? '#0e1014' : '');
+
+        if (pageBackground) {
+          document.documentElement.style.backgroundColor = pageBackground;
+        }
+      } catch (e) {
+        // storage can be blocked; the page then just starts on the browser's default colour
+      }
     </script>
 
     <% for (key in htmlWebpackPlugin.files.js) { %><script type="text/javascript" src="<%= htmlWebpackPlugin.files.js[key] %>" data-no-hash></script><% } %>
@@ -69,13 +82,6 @@
       saves fighting with CSS Modules for ~10 lines
     -->
     <style>
-      /* Match the dark theme before the app's own styles load, so there is no white flash on startup */
-      @media (prefers-color-scheme: dark) {
-        html, body {
-          background-color: #0e1014;
-        }
-      }
-
       .root {
         overflow: hidden;
         height: 100%; /* needed for proper layout */
