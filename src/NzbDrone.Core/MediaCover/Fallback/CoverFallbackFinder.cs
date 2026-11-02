@@ -23,15 +23,23 @@ namespace NzbDrone.Core.MediaCover.Fallback
 
         public CoverFallbackResult Find(CoverSearch search)
         {
+            var titles = CoverMatcher.SearchTitles(search.Title).ToList();
+
             foreach (var provider in _providers)
             {
                 try
                 {
-                    var url = provider.FindCoverUrl(search);
-
-                    if (!string.IsNullOrWhiteSpace(url))
+                    foreach (var title in titles)
                     {
-                        return new CoverFallbackResult(provider.Name, url);
+                        var attempt = title == search.Title
+                            ? search
+                            : new CoverSearch { Title = title, Author = search.Author, Isbn13 = search.Isbn13 };
+                        var url = provider.FindCoverUrl(attempt);
+
+                        if (!string.IsNullOrWhiteSpace(url))
+                        {
+                            return new CoverFallbackResult(provider.Name, url);
+                        }
                     }
                 }
                 catch (Exception ex)

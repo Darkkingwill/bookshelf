@@ -51,6 +51,9 @@ namespace NzbDrone.Core.MediaCover
 
         private static readonly TimeSpan NoFallbackRetry = TimeSpan.FromDays(30);
 
+        // The extensions a stored book cover can have; the fallback writes .jpg, metadata sources also gave .jpeg and .png.
+        private static readonly string[] CoverExtensions = { ".jpg", ".jpeg", ".png" };
+
         private readonly IMediaCoverProxy _mediaCoverProxy;
         private readonly IImageResizer _resizer;
         private readonly IBookService _bookService;
@@ -126,10 +129,14 @@ namespace NzbDrone.Core.MediaCover
                 if (coverEntity == MediaCoverEntity.Book &&
                     covers is ICollection<MediaCover> coverList &&
                     !coverList.IsReadOnly &&
-                    coverList.Count == 0 &&
-                    _diskProvider.FileExists(GetCoverPath(entityId, coverEntity, MediaCoverTypes.Cover, ".jpg")))
+                    coverList.Count == 0)
                 {
-                    coverList.Add(new MediaCover(MediaCoverTypes.Cover, "cover.jpg"));
+                    var stored = FindStoredBookCoverExtension(entityId);
+
+                    if (stored != null)
+                    {
+                        coverList.Add(new MediaCover(MediaCoverTypes.Cover, "cover" + stored));
+                    }
                 }
 
                 foreach (var mediaCover in covers)
@@ -139,17 +146,28 @@ namespace NzbDrone.Core.MediaCover
                         continue;
                     }
 
-                    var filePath = GetCoverPath(entityId, coverEntity, mediaCover.CoverType, mediaCover.Extension, null);
+                    var extension = mediaCover.Extension;
+
+                    // A book whose source gave a cover entry without a usable URL ("null") has no extension, but the
+                    // fallback stores its cover as cover.jpg, so point the entry at whatever cover is stored.
+                    if (coverEntity == MediaCoverEntity.Book &&
+                        mediaCover.CoverType == MediaCoverTypes.Cover &&
+                        extension.IsNullOrWhiteSpace())
+                    {
+                        extension = FindStoredBookCoverExtension(entityId) ?? extension;
+                    }
+
+                    var filePath = GetCoverPath(entityId, coverEntity, mediaCover.CoverType, extension, null);
 
                     mediaCover.RemoteUrl = mediaCover.Url;
 
                     if (coverEntity == MediaCoverEntity.Book)
                     {
-                        mediaCover.Url = _configFileProvider.UrlBase + @"/MediaCover/Books/" + entityId + "/" + mediaCover.CoverType.ToString().ToLower() + GetExtension(mediaCover.CoverType, mediaCover.Extension);
+                        mediaCover.Url = _configFileProvider.UrlBase + @"/MediaCover/Books/" + entityId + "/" + mediaCover.CoverType.ToString().ToLower() + GetExtension(mediaCover.CoverType, extension);
                     }
                     else
                     {
-                        mediaCover.Url = _configFileProvider.UrlBase + @"/MediaCover/" + entityId + "/" + mediaCover.CoverType.ToString().ToLower() + GetExtension(mediaCover.CoverType, mediaCover.Extension);
+                        mediaCover.Url = _configFileProvider.UrlBase + @"/MediaCover/" + entityId + "/" + mediaCover.CoverType.ToString().ToLower() + GetExtension(mediaCover.CoverType, extension);
                     }
 
                     if (_diskProvider.FileExists(filePath))
@@ -312,7 +330,7 @@ namespace NzbDrone.Core.MediaCover
             var extension = entry != null && entry.Extension.IsNotNullOrWhiteSpace() ? entry.Extension : ".jpg";
             var target = GetCoverPath(book.Id, MediaCoverEntity.Book, MediaCoverTypes.Cover, extension, null);
 
-            if (_diskProvider.FileExists(target) && _diskProvider.GetFileSize(target) >= MIN_USABLE_COVER_BYTES)
+            if (IsUsableCover(target))
             {
                 return false;
             }
@@ -369,6 +387,16 @@ namespace NzbDrone.Core.MediaCover
             }
 
             return true;
+        }
+
+        private string FindStoredBookCoverExtension(int bookId)
+        {
+            return CoverExtensions.FirstOrDefault(e => _diskProvider.FileExists(GetCoverPath(bookId, MediaCoverEntity.Book, MediaCoverTypes.Cover, e, null)));
+        }
+
+        private bool IsUsableCover(string path)
+        {
+            return _diskProvider.FileExists(path) && _diskProvider.GetFileSize(path) >= MIN_USABLE_COVER_BYTES;
         }
 
         private string GetBookMarkerPath(int bookId, string marker)

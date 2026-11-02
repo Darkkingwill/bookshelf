@@ -54,7 +54,8 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
               ""title"": ""Hardfought"", ""authors"": [ ""Greg Bear"" ],
               ""imageLinks"": { ""thumbnail"": ""http://books.google.com/books/content?id=X&zoom=1&edge=curl&source=gbs_api"" } } } ] }");
 
-            Subject.FindCoverUrl(_search).Should().Be("https://books.google.com/books/content?id=X&zoom=1&source=gbs_api");
+            // zoom=1 is a 128 px thumbnail; zoom=2 is the larger one
+            Subject.FindCoverUrl(_search).Should().Be("https://books.google.com/books/content?id=X&zoom=2&source=gbs_api");
 
             Mocker.GetMock<IHttpClient>().Verify(c => c.Get(It.Is<HttpRequest>(r => r.Url.ToString().Contains("key=KEY123"))), Times.Once());
         }

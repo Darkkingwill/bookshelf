@@ -68,5 +68,51 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
 
             Subject.Find(Search).Should().BeNull();
         }
+
+        [Test]
+        public void should_search_for_the_title_without_bracketed_noise()
+        {
+            var provider = new Mock<ICoverFallbackProvider>();
+            provider.SetupGet(p => p.Name).Returns("Only");
+            provider.Setup(p => p.FindCoverUrl(It.Is<CoverSearch>(s => s.Title == "In Fury Born"))).Returns("https://img/fury.jpg");
+            GivenProviders(provider);
+
+            var result = Subject.Find(new CoverSearch { Title = "In Fury Born (1)", Author = "David Weber", Isbn13 = "9780671721305" });
+
+            result.Url.Should().Be("https://img/fury.jpg");
+            provider.Verify(p => p.FindCoverUrl(It.Is<CoverSearch>(s => s.Author == "David Weber" && s.Isbn13 == "9780671721305")), Times.Once());
+        }
+
+        [Test]
+        public void should_retry_the_first_volume_without_its_number()
+        {
+            var provider = new Mock<ICoverFallbackProvider>();
+            provider.SetupGet(p => p.Name).Returns("Only");
+            provider.Setup(p => p.FindCoverUrl(It.Is<CoverSearch>(s => s.Title == "1% Lifesteal"))).Returns("https://img/lifesteal.jpg");
+            GivenProviders(provider);
+
+            Subject.Find(new CoverSearch { Title = "1% Lifesteal, Book One", Author = "Robert Blaise" }).Url.Should().Be("https://img/lifesteal.jpg");
+
+            provider.Verify(p => p.FindCoverUrl(It.Is<CoverSearch>(s => s.Title == "1% Lifesteal, Book One")), Times.Once());
+        }
+
+        [Test]
+        public void should_not_retry_a_provider_that_failed_but_still_try_the_next_one()
+        {
+            var broken = new Mock<ICoverFallbackProvider>();
+            broken.SetupGet(p => p.Name).Returns("Broken");
+            broken.SetupGet(p => p.Order).Returns(0);
+            broken.Setup(p => p.FindCoverUrl(It.IsAny<CoverSearch>())).Throws(new InvalidOperationException("rate limited"));
+
+            var working = new Mock<ICoverFallbackProvider>();
+            working.SetupGet(p => p.Name).Returns("Working");
+            working.SetupGet(p => p.Order).Returns(1);
+            working.Setup(p => p.FindCoverUrl(It.IsAny<CoverSearch>())).Returns("https://img/ok.jpg");
+            GivenProviders(broken, working);
+
+            Subject.Find(new CoverSearch { Title = "Wolfpack, Book 1", Author = "Someone" }).Source.Should().Be("Working");
+
+            broken.Verify(p => p.FindCoverUrl(It.IsAny<CoverSearch>()), Times.Once());
+        }
     }
 }

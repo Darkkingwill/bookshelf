@@ -14,6 +14,10 @@ namespace NzbDrone.Core.MediaCover.Fallback
         private const double AuthorThreshold = 0.8;
 
         private static readonly Regex Bracketed = new Regex(@"\(.*?\)|\[.*?\]", RegexOptions.Compiled);
+        private static readonly Regex Spaces = new Regex(@"\s+", RegexOptions.Compiled);
+
+        // "1% Lifesteal, Book One" is listed as "1% Lifesteal"; only the first volume loses its number this way.
+        private static readonly Regex FirstVolumeSuffix = new Regex(@"[\s,:\-]+(?:book|volume|vol|part)\.?\s*(?:one|1)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static bool TitlesMatch(string localTitle, string candidateTitle, string candidateSubtitle = null)
         {
@@ -41,6 +45,33 @@ namespace NzbDrone.Core.MediaCover.Fallback
             });
         }
 
+        // The titles worth putting in a provider's search box: the title without "(1)" or "[Unabridged]" noise, then without a
+        // trailing "Book One". Provider searches match words exactly, so "In Fury Born (1)" finds nothing but "In Fury Born"
+        // does.
+        public static IEnumerable<string> SearchTitles(string title)
+        {
+            var cleaned = CleanTitle(title);
+
+            if (cleaned.Length == 0)
+            {
+                yield break;
+            }
+
+            yield return cleaned;
+
+            var firstVolume = FirstVolumeSuffix.Replace(cleaned, string.Empty).Trim();
+
+            if (firstVolume.Length > 0 && firstVolume != cleaned)
+            {
+                yield return firstVolume;
+            }
+        }
+
+        private static string CleanTitle(string title)
+        {
+            return string.IsNullOrWhiteSpace(title) ? string.Empty : Spaces.Replace(Bracketed.Replace(title, " "), " ").Trim();
+        }
+
         // Audible often puts the real title in the subtitle ("Dark Tower I" / "The Gunslinger"), and a subtitle after a
         // colon is optional, so compare the title with and without it. A first book is often listed without its number.
         private static IEnumerable<string> TitleForms(string title)
@@ -50,8 +81,8 @@ namespace NzbDrone.Core.MediaCover.Fallback
                 yield break;
             }
 
-            var cleaned = Bracketed.Replace(title, " ");
-            var forms = new List<string> { cleaned };
+            var cleaned = CleanTitle(title);
+            var forms = new List<string>(SearchTitles(title));
             var colon = cleaned.IndexOf(':');
 
             if (colon > 0)

@@ -13,6 +13,9 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
         [TestCase("Wolfpack 1", "Wolfpack")]
         [TestCase("Death Row", "Death Row (Unabridged)")]
         [TestCase("Mistborn: The Final Empire", "The Final Empire")]
+        [TestCase("1% Lifesteal, Book One", "1% Lifesteal")]
+        [TestCase("Wolfpack, Book 1", "Wolfpack")]
+        [TestCase("In Fury Born (1)", "In Fury Born")]
         public void should_match_the_same_title(string local, string candidate)
         {
             CoverMatcher.TitlesMatch(local, candidate).Should().BeTrue();
@@ -31,9 +34,39 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
         [TestCase("It", "It Ends with Us")]
         [TestCase("Dune", "Dune Messiah")]
         [TestCase("Project Hail Mary", "The Martian")]
+        [TestCase("The Perfect Run, Book Two", "The Perfect Run")]
+        [TestCase("Wolfpack, Book 2", "Wolfpack")]
         public void should_not_match_a_different_book(string local, string candidate)
         {
             CoverMatcher.TitlesMatch(local, candidate).Should().BeFalse();
+        }
+
+        [Test]
+        public void should_search_for_the_title_without_bracketed_noise()
+        {
+            CoverMatcher.SearchTitles("In Fury Born (1)").Should().Equal("In Fury Born");
+            CoverMatcher.SearchTitles("Death Row [Unabridged]").Should().Equal("Death Row");
+        }
+
+        [Test]
+        public void should_also_search_for_the_first_volume_without_its_number()
+        {
+            CoverMatcher.SearchTitles("1% Lifesteal, Book One").Should().Equal("1% Lifesteal, Book One", "1% Lifesteal");
+            CoverMatcher.SearchTitles("Wolfpack: Volume 1").Should().Equal("Wolfpack: Volume 1", "Wolfpack");
+        }
+
+        [Test]
+        public void should_not_drop_the_number_of_a_later_volume()
+        {
+            CoverMatcher.SearchTitles("The Perfect Run, Book Two").Should().Equal("The Perfect Run, Book Two");
+            CoverMatcher.SearchTitles("Wolfpack 2").Should().Equal("Wolfpack 2");
+        }
+
+        [Test]
+        public void should_search_for_nothing_without_a_title()
+        {
+            CoverMatcher.SearchTitles(null).Should().BeEmpty();
+            CoverMatcher.SearchTitles("  (1) ").Should().BeEmpty();
         }
 
         [TestCase("Andy Weir", "Andy Weir")]

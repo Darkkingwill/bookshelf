@@ -77,8 +77,9 @@ namespace NzbDrone.Core.MediaCover.Fallback
                     continue;
                 }
 
-                // Google serves http thumbnails with a page-curl effect; ask for the plain https image.
-                return image.Replace("http://", "https://").Replace("&edge=curl", string.Empty);
+                // Google serves http thumbnails with a page-curl effect and at 128 px (zoom=1); ask for the plain https image
+                // at the next size up.
+                return image.Replace("http://", "https://").Replace("&edge=curl", string.Empty).Replace("zoom=1", "zoom=2");
             }
 
             return null;

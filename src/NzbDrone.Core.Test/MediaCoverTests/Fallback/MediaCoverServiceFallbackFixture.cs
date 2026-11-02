@@ -147,7 +147,11 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
             GivenFileExists(p => !IsMarker(p));
 
             // the existing file is a few KB; the downloaded replacement is a normal size
-            Mocker.GetMock<IDiskProvider>().SetupSequence(d => d.GetFileSize(It.IsAny<string>())).Returns(3000).Returns(40000);
+            var downloaded = false;
+            Mocker.GetMock<IHttpClient>()
+                  .Setup(c => c.DownloadFile(FoundUrl, It.IsAny<string>(), It.IsAny<string>()))
+                  .Callback(() => downloaded = true);
+            Mocker.GetMock<IDiskProvider>().Setup(d => d.GetFileSize(It.IsAny<string>())).Returns(() => downloaded ? 40000 : 3000);
 
             Subject.EnsureBookCovers(_book);
 
@@ -267,6 +271,55 @@ namespace NzbDrone.Core.Test.MediaCoverTests.Fallback
             Subject.ConvertToLocalUrls(4, MediaCoverEntity.Book, covers);
 
             covers.Should().ContainSingle();
+        }
+
+        [Test]
+        public void should_point_a_cover_entry_without_a_url_at_the_stored_jpg()
+        {
+            // some sources store the literal text "null" as the URL, which leaves the entry with no extension
+            var covers = new List<MediaCover.MediaCover> { new MediaCover.MediaCover(MediaCoverTypes.Cover, "null") };
+
+            Mocker.GetMock<IDiskProvider>().Setup(d => d.FileExists(It.Is<string>(p => p.EndsWith("cover.jpg")))).Returns(true);
+            Mocker.GetMock<IDiskProvider>().Setup(d => d.FileGetLastWrite(It.IsAny<string>())).Returns(new DateTime(1234));
+
+            Subject.ConvertToLocalUrls(4, MediaCoverEntity.Book, covers);
+
+            covers.Single().Url.Should().Be("/MediaCover/Books/4/cover.jpg?lastWrite=1234");
+        }
+
+        [Test]
+        public void should_show_a_stored_jpeg_for_a_book_whose_metadata_has_no_cover_entry()
+        {
+            var covers = new List<MediaCover.MediaCover>();
+
+            Mocker.GetMock<IDiskProvider>().Setup(d => d.FileExists(It.Is<string>(p => p.EndsWith("cover.jpeg")))).Returns(true);
+            Mocker.GetMock<IDiskProvider>().Setup(d => d.FileGetLastWrite(It.IsAny<string>())).Returns(new DateTime(1234));
+
+            Subject.ConvertToLocalUrls(4, MediaCoverEntity.Book, covers);
+
+            covers.Single().Url.Should().Be("/MediaCover/Books/4/cover.jpeg?lastWrite=1234");
+        }
+
+        [Test]
+        public void should_look_up_a_cover_when_the_one_the_book_points_at_is_missing_even_if_another_extension_is_stored()
+        {
+            // the metadata says cover.jpg, which is a tiny placeholder; an old cover.jpeg is not what the UI would show
+            GivenMetadataCover("https://goodreads.example/x.jpg");
+            GivenFileExists(p => !IsMarker(p) && !p.EndsWith("cover.jpg"));
+
+            Subject.FillMissingCover(_book).Should().BeTrue();
+
+            Mocker.GetMock<ICoverFallbackFinder>().Verify(f => f.Find(It.IsAny<CoverSearch>()), Times.Once());
+        }
+
+        [Test]
+        public void should_leave_a_cover_entry_without_a_url_alone_when_nothing_is_stored()
+        {
+            var covers = new List<MediaCover.MediaCover> { new MediaCover.MediaCover(MediaCoverTypes.Cover, "null") };
+
+            Subject.ConvertToLocalUrls(4, MediaCoverEntity.Book, covers);
+
+            covers.Single().Url.Should().Be("/MediaCover/Books/4/cover");
         }
     }
 }
