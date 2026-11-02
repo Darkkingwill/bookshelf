@@ -1,8 +1,8 @@
 using System;
-using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.Books;
 
 namespace NzbDrone.Core.Notifications.Goodreads
 {
@@ -19,8 +19,12 @@ namespace NzbDrone.Core.Notifications.Goodreads
 
         public override void OnReleaseImport(BookDownloadMessage message)
         {
-            var bookId = message.Book.Editions.Value.Single(x => x.Monitored).ForeignEditionId;
-            AddOwnedBook(bookId);
+            var edition = message.Book.Editions.Value.GetMonitoredEdition();
+
+            if (edition != null)
+            {
+                AddOwnedBook(edition.ForeignEditionId);
+            }
         }
 
         private void AddOwnedBook(string bookId)

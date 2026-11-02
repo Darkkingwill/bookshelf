@@ -4,6 +4,7 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.Books;
 using NzbDrone.Core.MetadataSource.Goodreads;
 using NzbDrone.Core.Validation;
 
@@ -36,8 +37,12 @@ namespace NzbDrone.Core.Notifications.Goodreads
                 }
             }
 
-            var bookId = importedBook.Editions.Value.Single(x => x.Monitored).ForeignEditionId;
-            AddToShelves(bookId, Settings.AddIds);
+            var edition = importedBook.Editions.Value.GetMonitoredEdition();
+
+            if (edition != null)
+            {
+                AddToShelves(edition.ForeignEditionId, Settings.AddIds);
+            }
         }
 
         public override void OnAuthorDelete(AuthorDeleteMessage deleteMessage)
