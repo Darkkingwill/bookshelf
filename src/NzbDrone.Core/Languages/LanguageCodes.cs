@@ -5,9 +5,11 @@ using System.Reflection;
 using System.Text.Json;
 using NzbDrone.Common.Extensions;
 
-namespace NzbDrone.Core.Books.Calibre
+namespace NzbDrone.Core.Languages
 {
-    public static class Extensions
+    // ISO 639 language codes: turns the language of a file or an edition ("en", "English", "eng") into its three-letter code, so
+    // two spellings of the same language compare equal.
+    public static class LanguageCodes
     {
         private static readonly Dictionary<string, string> TwoToThree;
         private static readonly Dictionary<string, string> ByThree;
@@ -40,7 +42,7 @@ namespace NzbDrone.Core.Books.Calibre
 
         public static HashSet<string> KnownLanguages { get; }
 
-        static Extensions()
+        static LanguageCodes()
         {
             var assembly = Assembly.GetExecutingAssembly();
             TwoToThree = InitializeDictionary(assembly, "2to3.json");
@@ -64,7 +66,7 @@ namespace NzbDrone.Core.Books.Calibre
             return JsonSerializer.Deserialize<Dictionary<string, string>>(data);
         }
 
-        // Translated from https://github.com/kovidgoyal/calibre/blob/ba06b7452228cfde9114e4735fb8d5785fba4955/src/calibre/utils/localization.py#L430
+        // Translated from Calibre, https://github.com/kovidgoyal/calibre/blob/ba06b7452228cfde9114e4735fb8d5785fba4955/src/calibre/utils/localization.py#L430
         public static string CanonicalizeLanguage(this string raw)
         {
             if (raw.IsNullOrWhiteSpace())

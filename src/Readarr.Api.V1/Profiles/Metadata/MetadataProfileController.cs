@@ -29,7 +29,7 @@ namespace Readarr.Api.V1.Profiles.Metadata
                     .Trim(',')
                     .Split(',')
                     .Select(y => y.Trim())
-                    .All(y => y == "null" || NzbDrone.Core.Books.Calibre.Extensions.KnownLanguages.Contains(y)))
+                    .All(y => y == "null" || NzbDrone.Core.Languages.LanguageCodes.KnownLanguages.Contains(y)))
                 .When(x => x.AllowedLanguages.IsNotNullOrWhiteSpace())
                 .WithMessage("Unknown languages");
         }

@@ -37,27 +37,6 @@ const writeAudioTagOptions = [
   }
 ];
 
-const writeBookTagOptions = [
-  {
-    key: 'sync',
-    get value() {
-      return translate('WriteTagsSync');
-    }
-  },
-  {
-    key: 'allFiles',
-    get value() {
-      return translate('WriteTagsAll');
-    }
-  },
-  {
-    key: 'newFiles',
-    get value() {
-      return translate('WriteTagsNew');
-    }
-  }
-];
-
 function MetadataProvider(props) {
   const {
     isFetching,
@@ -85,53 +64,6 @@ function MetadataProvider(props) {
       {
         hasSettings && !isFetching && !error &&
           <Form>
-            <FieldSet legend={translate('CalibreMetadata')}>
-              <FormGroup>
-                <FormLabel>
-                  {translate('SendMetadataToCalibre')}
-                </FormLabel>
-
-                <FormInputGroup
-                  type={inputTypes.SELECT}
-                  name="writeBookTags"
-                  helpTextWarning={translate('WriteBookTagsHelpTextWarning')}
-                  helpLink="https://wiki.servarr.com/readarr/settings#write-metadata-to-book-files"
-                  values={writeBookTagOptions}
-                  onChange={onInputChange}
-                  {...settings.writeBookTags}
-                />
-              </FormGroup>
-
-              <FormGroup>
-                <FormLabel>
-                  {translate('UpdateCovers')}
-                </FormLabel>
-
-                <FormInputGroup
-                  type={inputTypes.CHECK}
-                  name="updateCovers"
-                  helpText={translate('UpdateCoversHelpText')}
-                  onChange={onInputChange}
-                  {...settings.updateCovers}
-                />
-              </FormGroup>
-
-              <FormGroup>
-                <FormLabel>
-                  {translate('EmbedMetadataInBookFiles')}
-                </FormLabel>
-
-                <FormInputGroup
-                  type={inputTypes.CHECK}
-                  name="embedMetadata"
-                  helpText={translate('EmbedMetadataHelpText')}
-                  onChange={onInputChange}
-                  {...settings.embedMetadata}
-                />
-              </FormGroup>
-
-            </FieldSet>
-
             <FieldSet legend={translate('AudioFileMetadata')}>
               <FormGroup>
                 <FormLabel>{translate('WriteAudioTags')}</FormLabel>

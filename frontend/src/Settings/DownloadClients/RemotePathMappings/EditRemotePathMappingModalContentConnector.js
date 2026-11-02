@@ -15,9 +15,8 @@ const newRemotePathMapping = {
 
 const selectDownloadClientHosts = createSelector(
   (state) => state.settings.downloadClients.items,
-  (state) => state.settings.rootFolders.items,
-  (downloadClients, rootFolders) => {
-    const dlhosts = downloadClients.reduce((acc, downloadClient) => {
+  (downloadClients) => {
+    const hosts = downloadClients.reduce((acc, downloadClient) => {
       const name = downloadClient.name;
       const host = downloadClient.fields.find((field) => {
         return field.name === 'host';
@@ -30,17 +29,6 @@ const selectDownloadClientHosts = createSelector(
 
       return acc;
     }, {});
-
-    const hosts = rootFolders.reduce((acc, folder) => {
-      const name = folder.name;
-
-      if (folder.isCalibreLibrary) {
-        const group = acc[folder.host] = acc[folder.host] || [];
-        group.push(name);
-      }
-
-      return acc;
-    }, dlhosts);
 
     return Object.keys(hosts).map((host) => {
       return {

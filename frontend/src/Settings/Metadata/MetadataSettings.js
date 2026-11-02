@@ -9,7 +9,6 @@ import PageContentBody from 'Components/Page/PageContentBody';
 import { icons, kinds } from 'Helpers/Props';
 import SettingsToolbarConnector from 'Settings/SettingsToolbarConnector';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
-import translate from 'Utilities/String/translate';
 // import MetadatasConnector from './Metadata/MetadatasConnector';
 import MetadataProviderConnector from './MetadataProvider/MetadataProviderConnector';
 
@@ -65,7 +64,7 @@ class MetadataSettings extends Component {
   onProviderToggle = (key) => {
     this.setState((prevState) => {
       const updated = prevState.metadataProviders.map((p) =>
-        p.key === key ? { ...p, enabled: !p.enabled } : p
+        (p.key === key ? { ...p, enabled: !p.enabled } : p)
       );
 
       return {
@@ -100,9 +99,9 @@ class MetadataSettings extends Component {
   onProviderSettingChange = (key, settingKey, value) => {
     this.setState((prevState) => {
       const updated = prevState.metadataProviders.map((p) =>
-        p.key === key
+        (p.key === key
           ? { ...p, settings: { ...p.settings, [settingKey]: value } }
-          : p
+          : p)
       );
 
       return {
@@ -115,7 +114,7 @@ class MetadataSettings extends Component {
   onCustomFieldChange = (key, field, value) => {
     this.setState((prevState) => {
       const updated = prevState.metadataProviders.map((p) =>
-        p.key === key ? { ...p, [field]: value } : p
+        (p.key === key ? { ...p, [field]: value } : p)
       );
 
       return {

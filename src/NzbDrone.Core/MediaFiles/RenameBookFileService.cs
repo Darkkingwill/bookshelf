@@ -74,8 +74,7 @@ namespace NzbDrone.Core.MediaFiles
         {
             var counts = files.GroupBy(x => x.EditionId).ToDictionary(g => g.Key, g => g.Count());
 
-            // Don't rename Calibre files
-            foreach (var f in files.Where(x => x.CalibreId == 0))
+            foreach (var f in files)
             {
                 var file = f;
                 file.PartCount = counts[file.EditionId];
@@ -117,8 +116,7 @@ namespace NzbDrone.Core.MediaFiles
             var counts = allFiles.GroupBy(x => x.EditionId).ToDictionary(g => g.Key, g => g.Count());
             var renamed = new List<RenamedBookFile>();
 
-            // Don't rename Calibre files
-            foreach (var bookFile in bookFiles.Where(x => x.CalibreId == 0))
+            foreach (var bookFile in bookFiles)
             {
                 var previousPath = bookFile.Path;
                 bookFile.PartCount = counts[bookFile.EditionId];

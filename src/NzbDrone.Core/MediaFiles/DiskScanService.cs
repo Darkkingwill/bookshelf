@@ -10,9 +10,7 @@ using NzbDrone.Common;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
-using NzbDrone.Common.Serializer;
 using NzbDrone.Core.Books;
-using NzbDrone.Core.Books.Calibre;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.MediaFiles.BookImport;
 using NzbDrone.Core.MediaFiles.Commands;
@@ -41,7 +39,6 @@ namespace NzbDrone.Core.MediaFiles
 
         private readonly IConfigService _configService;
         private readonly IDiskProvider _diskProvider;
-        private readonly ICalibreProxy _calibre;
         private readonly IMediaFileService _mediaFileService;
         private readonly IMakeImportDecision _importDecisionMaker;
         private readonly IImportApprovedBooks _importApprovedTracks;
@@ -53,7 +50,6 @@ namespace NzbDrone.Core.MediaFiles
 
         public DiskScanService(IConfigService configService,
                                IDiskProvider diskProvider,
-                               ICalibreProxy calibre,
                                IMediaFileService mediaFileService,
                                IMakeImportDecision importDecisionMaker,
                                IImportApprovedBooks importApprovedTracks,
@@ -65,7 +61,6 @@ namespace NzbDrone.Core.MediaFiles
         {
             _configService = configService;
             _diskProvider = diskProvider;
-            _calibre = calibre;
 
             _mediaFileService = mediaFileService;
             _importDecisionMaker = importDecisionMaker;
@@ -179,7 +174,6 @@ namespace NzbDrone.Core.MediaFiles
                 .Select(decision => new BookFile
                 {
                     Path = decision.Item.Path,
-                    CalibreId = decision.Item.CalibreId,
                     Part = decision.Item.Part,
                     PartCount = decision.Item.PartCount,
                     Size = decision.Item.Size,
@@ -247,26 +241,11 @@ namespace NzbDrone.Core.MediaFiles
         {
             IEnumerable<IFileInfo> filesOnDisk;
 
-            var rootFolder = _rootFolderService.GetBestRootFolder(path);
+            _logger.Debug("Scanning '{0}' for book files", path);
 
-            _logger.Trace(rootFolder.ToJson());
+            filesOnDisk = _diskProvider.GetFileInfos(path, allDirectories);
 
-            if (rootFolder != null && rootFolder.IsCalibreLibrary && rootFolder.CalibreSettings != null)
-            {
-                _logger.Info($"Getting book list from calibre for {path}");
-                var paths = _calibre.GetAllBookFilePaths(rootFolder.CalibreSettings);
-                var folderPaths = paths.Where(x => path.IsParentPath(x));
-
-                filesOnDisk = folderPaths.Select(x => _diskProvider.GetFileInfo(x));
-            }
-            else
-            {
-                _logger.Debug("Scanning '{0}' for ebook files", path);
-
-                filesOnDisk = _diskProvider.GetFileInfos(path, allDirectories);
-
-                _logger.Trace("{0} files were found in {1}", filesOnDisk.Count(), path);
-            }
+            _logger.Trace("{0} files were found in {1}", filesOnDisk.Count(), path);
 
             var mediaFileList = filesOnDisk.Where(file => MediaFileExtensions.AllExtensions.Contains(file.Extension))
                 .ToArray();
