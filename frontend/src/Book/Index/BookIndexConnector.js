@@ -19,6 +19,7 @@ function createMapStateToProps() {
     createCommandExecutingSelector(commandNames.BULK_REFRESH_AUTHOR),
     createCommandExecutingSelector(commandNames.BULK_REFRESH_BOOK),
     createCommandExecutingSelector(commandNames.RSS_SYNC),
+    createCommandExecutingSelector(commandNames.FIND_MISSING_COVERS),
     createCommandExecutingSelector(commandNames.CUTOFF_UNMET_BOOK_SEARCH),
     createCommandExecutingSelector(commandNames.MISSING_BOOK_SEARCH),
     createDimensionsSelector(),
@@ -27,6 +28,7 @@ function createMapStateToProps() {
       isRefreshingAuthorCommand,
       isRefreshingBookCommand,
       isRssSyncExecuting,
+      isFindingCovers,
       isCutoffBooksSearch,
       isMissingBooksSearch,
       dimensionsState
@@ -36,6 +38,7 @@ function createMapStateToProps() {
         ...book,
         isRefreshingBook,
         isRssSyncExecuting,
+        isFindingCovers,
         isSearching: isCutoffBooksSearch || isMissingBooksSearch,
         isSmallScreen: dimensionsState.isSmallScreen
       };
@@ -75,6 +78,12 @@ function createMapDispatchToProps(dispatch, props) {
     onRssSyncPress() {
       dispatch(executeCommand({
         name: commandNames.RSS_SYNC
+      }));
+    },
+
+    onFindCoversPress() {
+      dispatch(executeCommand({
+        name: commandNames.FIND_MISSING_COVERS
       }));
     },
 

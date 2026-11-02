@@ -22,6 +22,12 @@
   width: 120px;
 }
 
+.length {
+  composes: cell from '~Components/Table/Cells/TableRowCell.css';
+
+  width: 100px;
+}
+
 .pageCount {
   composes: cell from '~Components/Table/Cells/TableRowCell.css';
 

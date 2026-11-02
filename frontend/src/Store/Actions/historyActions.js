@@ -56,7 +56,7 @@ export const defaultState = {
       name: 'customFormats',
       label: 'Formats',
       isSortable: false,
-      isVisible: true
+      isVisible: false
     },
     {
       name: 'date',

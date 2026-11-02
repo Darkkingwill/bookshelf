@@ -1,4 +1,9 @@
-const readarrRed = '#ca302d';
+// Bookshelf dark theme: deep ink surfaces with a single indigo accent.
+//
+// The accent is exported as `readarrRed` because dozens of stylesheets still read var(--readarrRed). Keeping that name
+// rebrands all of them at once; rename it when those stylesheets are touched.
+const brand = '#6366f1';
+const brandLight = '#a5b4fc';
 const darkGray = '#888';
 const gray = '#adadad';
 const black = '#000';
@@ -8,37 +13,45 @@ const purple = '#7a43b6';
 const pink = '#ff69b4';
 const lightGray = '#ddd';
 
+// Surfaces, darkest to lightest
+const surface0 = '#0e1014';
+const surface1 = '#14161c';
+const surface2 = '#1a1d25';
+const surface3 = '#1f232d';
+const surface4 = '#262b36';
+const line = '#2a2f3b';
+
 module.exports = {
-  textColor: '#ccc',
-  defaultColor: '#ccc',
-  disabledColor: '#999',
-  dimColor: '#555',
+  textColor: '#d7dbe4',
+  defaultColor: '#d7dbe4',
+  disabledColor: '#8b93a3',
+  dimColor: '#6b7280',
   black,
   white,
   offWhite,
   blue: '#06f',
-  primaryColor: '#5d9cec',
+  primaryColor: '#7c83ff',
   selectedColor: '#f9be03',
-  successColor: '#27c24c',
-  dangerColor: '#f05050',
-  warningColor: '#ffa500',
-  infoColor: readarrRed,
+  successColor: '#34c759',
+  dangerColor: '#f05252',
+  warningColor: '#f5a524',
+  infoColor: brand,
   purple,
   pink,
-  readarrRed,
-  helpTextColor: '#909293',
+  readarrRed: brand,
+  helpTextColor: '#8b93a3',
   darkGray,
   gray,
   lightGray,
 
   // Theme Colors
 
-  themeRed: readarrRed,
-  themeAlternateRed: '#a41726',
-  themeDarkRed: '#66001a',
-  themeDarkColor: '#494949',
-  themeLightColor: '#595959',
-  pageBackground: '#202020',
+  themeRed: brand,
+  themeAlternateRed: '#4f46e5',
+  themeDarkRed: '#312e81',
+  themeDarkColor: line,
+  themeLightColor: '#3a4150',
+  pageBackground: surface0,
   pageFooterBackgroud: 'rgba(0, 0, 0, .25)',
 
   torrentColor: '#00853d',
@@ -47,40 +60,40 @@ module.exports = {
   // Labels
   inverseLabelColor: '#ddd',
   inverseLabelTextColor: '#333',
-  disabledLabelColor: '#838383',
+  disabledLabelColor: '#4b5260',
   infoTextColor: white,
 
   // Links
   defaultLinkHoverColor: '#fff',
   linkColor: '#fff',
-  linkHoverColor: '#ca302d',
+  linkHoverColor: brandLight,
 
   // Header
-  pageHeaderBackgroundColor: '#2a2a2a',
+  pageHeaderBackgroundColor: surface1,
 
   // Sidebar
 
-  sidebarColor: '#e1e2e3',
-  sidebarBackgroundColor: '#2a2a2a',
-  sidebarActiveBackgroundColor: '#333333',
+  sidebarColor: '#c9cfdb',
+  sidebarBackgroundColor: surface1,
+  sidebarActiveBackgroundColor: surface3,
 
   // Toolbar
-  toolbarColor: '#e1e2e3',
-  toolbarBackgroundColor: '#262626',
-  toolbarMenuItemBackgroundColor: '#333',
-  toolbarMenuItemHoverBackgroundColor: '#414141',
-  toolbarLabelColor: '#e1e2e3',
+  toolbarColor: '#c9cfdb',
+  toolbarBackgroundColor: '#12151b',
+  toolbarMenuItemBackgroundColor: surface3,
+  toolbarMenuItemHoverBackgroundColor: surface4,
+  toolbarLabelColor: '#c9cfdb',
 
   // Accents
-  borderColor: '#858585',
-  inputBorderColor: '#dde6e9',
+  borderColor: line,
+  inputBorderColor: '#2f3542',
   inputBoxShadowColor: 'rgba(0, 0, 0, 0.075)',
-  inputFocusBorderColor: '#66afe9',
-  inputFocusBoxShadowColor: 'rgba(102, 175, 233, 0.6)',
-  inputErrorBorderColor: '#f05050',
-  inputErrorBoxShadowColor: 'rgba(240, 80, 80, 0.6)',
-  inputWarningBorderColor: '#ffa500',
-  inputWarningBoxShadowColor: 'rgba(255, 165, 0, 0.6)',
+  inputFocusBorderColor: brand,
+  inputFocusBoxShadowColor: 'rgba(99, 102, 241, 0.35)',
+  inputErrorBorderColor: '#f05252',
+  inputErrorBoxShadowColor: 'rgba(240, 82, 82, 0.6)',
+  inputWarningBorderColor: '#f5a524',
+  inputWarningBoxShadowColor: 'rgba(245, 165, 36, 0.6)',
   colorImpairedGradient: '#707070',
   colorImpairedGradientDark: '#424242',
   colorImpairedDangerGradient: '#d84848',
@@ -91,16 +104,16 @@ module.exports = {
   //
   // Buttons
 
-  defaultButtonTextColor: '#eee',
-  defaultBackgroundColor: '#333',
-  defaultBorderColor: '#393f45',
-  defaultHoverBackgroundColor: '#444',
-  defaultHoverBorderColor: '#5a6265',
+  defaultButtonTextColor: '#e6e9ef',
+  defaultBackgroundColor: surface3,
+  defaultBorderColor: line,
+  defaultHoverBackgroundColor: surface4,
+  defaultHoverBorderColor: '#3a4150',
 
-  primaryBackgroundColor: '#0b8750',
-  primaryBorderColor: '#1d563d',
-  primaryHoverBackgroundColor: '#097948',
-  primaryHoverBorderColor: '#1D563D',
+  primaryBackgroundColor: brand,
+  primaryBorderColor: '#5457e5',
+  primaryHoverBackgroundColor: '#575ae6',
+  primaryHoverBorderColor: '#4a4dd8',
 
   successBackgroundColor: '#27c24c',
   successBorderColor: '#26be4a',
@@ -124,35 +137,35 @@ module.exports = {
   //
   // Modal
 
-  modalBackdropBackgroundColor: 'rgba(0, 0, 0, 0.6)',
-  modalBackgroundColor: '#2a2a2a',
+  modalBackdropBackgroundColor: 'rgba(0, 0, 0, 0.65)',
+  modalBackgroundColor: surface2,
   modalCloseButtonHoverColor: '#888',
 
   //
   // Menu
-  menuItemColor: '#e1e2e3',
-  menuItemHoverColor: readarrRed,
-  menuItemHoverBackgroundColor: '#606060',
+  menuItemColor: '#c9cfdb',
+  menuItemHoverColor: brandLight,
+  menuItemHoverBackgroundColor: surface4,
 
   //
   // Toolbar
 
-  toobarButtonHoverColor: readarrRed,
-  toobarButtonSelectedColor: readarrRed,
+  toobarButtonHoverColor: brandLight,
+  toobarButtonSelectedColor: brandLight,
 
   //
   // Scroller
 
-  scrollbarBackgroundColor: '#707070',
-  scrollbarHoverBackgroundColor: '#606060',
+  scrollbarBackgroundColor: '#3a4150',
+  scrollbarHoverBackgroundColor: '#4a5263',
 
   //
   // Card
 
-  cardBackgroundColor: '#333333',
-  cardShadowColor: '#111',
-  cardAlternateBackgroundColor: '#333333',
-  cardCenterBackgroundColor: '#2a2a2a',
+  cardBackgroundColor: surface2,
+  cardShadowColor: '#000',
+  cardAlternateBackgroundColor: surface2,
+  cardCenterBackgroundColor: surface1,
 
   //
   // Alert
@@ -161,8 +174,8 @@ module.exports = {
   alertDangerBackgroundColor: 'rgba(255,0,0,0.1)',
   alertDangerColor: '#ccc',
 
-  alertInfoBorderColor: '#31708f',
-  alertInfoBackgroundColor: 'rgba(0,0,255,0.1)',
+  alertInfoBorderColor: '#4a4dd8',
+  alertInfoBackgroundColor: 'rgba(99,102,241,0.12)',
   alertInfoColor: '#ccc',
 
   alertSuccessBorderColor: '#3c763d',
@@ -176,14 +189,14 @@ module.exports = {
   //
   // Slider
 
-  sliderAccentColor: '#0b8750',
+  sliderAccentColor: brand,
 
   //
   // Form
 
-  inputBackgroundColor: '#333',
-  inputReadOnlyBackgroundColor: '#222',
-  inputHoverBackgroundColor: 'rgba(255, 255, 255, 0.20)',
+  inputBackgroundColor: surface2,
+  inputReadOnlyBackgroundColor: surface1,
+  inputHoverBackgroundColor: 'rgba(255, 255, 255, 0.10)',
   inputSelectedBackgroundColor: 'rgba(255, 255, 255, 0.05)',
   advancedFormLabelColor: '#ff902b',
   disabledCheckInputColor: '#ddd',
@@ -192,11 +205,11 @@ module.exports = {
   //
   // Popover
 
-  popoverTitleBackgroundColor: '#424242',
-  popoverTitleBorderColor: '#2a2a2a',
-  popoverBodyBackgroundColor: '#2a2a2a',
+  popoverTitleBackgroundColor: surface4,
+  popoverTitleBorderColor: surface1,
+  popoverBodyBackgroundColor: surface2,
   popoverShadowColor: 'rgba(0, 0, 0, 0.2)',
-  popoverArrowBorderColor: '#2a2a2a',
+  popoverArrowBorderColor: surface2,
 
   popoverTitleBackgroundInverseColor: '#595959',
   popoverTitleBorderInverseColor: '#707070',
@@ -206,36 +219,36 @@ module.exports = {
   //
   // Calendar
 
-  calendarTodayBackgroundColor: '#3e3e3e',
-  calendarBackgroundColor: '#2a2a2a',
-  calendarBorderColor: '#393f45',
+  calendarTodayBackgroundColor: surface4,
+  calendarBackgroundColor: surface1,
+  calendarBorderColor: line,
   calendarTextDim: '#eee',
   calendarTextDimAlternate: '#fff',
 
   //
   // Table
 
-  tableRowHoverBackgroundColor: 'rgba(255, 255, 255, 0.08)',
+  tableRowHoverBackgroundColor: 'rgba(255, 255, 255, 0.04)',
 
   //
   // Series
 
-  addSeriesBackgroundColor: '#2a2a2a',
-  seriesBackgroundColor: '#2a2a2a',
-  searchIconContainerBackgroundColor: '#2b2b2b',
-  collapseButtonBackgroundColor: '#2a2a2a',
+  addSeriesBackgroundColor: surface1,
+  seriesBackgroundColor: surface1,
+  searchIconContainerBackgroundColor: surface3,
+  collapseButtonBackgroundColor: surface1,
 
   //
   // Season
 
-  seasonBackgroundColor: '#424242',
-  episodesBackgroundColor: '#2a2a2a',
+  seasonBackgroundColor: surface4,
+  episodesBackgroundColor: surface1,
 
   //
   // misc
 
   progressBarFrontTextColor: white,
   progressBarBackTextColor: white,
-  progressBarBackgroundColor: '#727070',
-  logEventsBackgroundColor: '#2a2a2a'
+  progressBarBackgroundColor: '#2f3542',
+  logEventsBackgroundColor: surface1
 };

@@ -8,8 +8,6 @@ import AuthorDetailsPageConnector from 'Author/Details/AuthorDetailsPageConnecto
 import AuthorIndexConnector from 'Author/Index/AuthorIndexConnector';
 import BookDetailsPageConnector from 'Book/Details/BookDetailsPageConnector';
 import BookIndexConnector from 'Book/Index/BookIndexConnector';
-import BookshelfConnector from 'Bookshelf/BookshelfConnector';
-import CalendarPageConnector from 'Calendar/CalendarPageConnector';
 import NotFound from 'Components/NotFound';
 import Switch from 'Components/Router/Switch';
 import AddNewItemConnector from 'Search/AddNewItemConnector';
@@ -35,8 +33,6 @@ import Tasks from 'System/Tasks/Tasks';
 import Updates from 'System/Updates/Updates';
 import UnmappedFilesTableConnector from 'UnmappedFiles/UnmappedFilesTableConnector';
 import getPathWithUrlBase from 'Utilities/getPathWithUrlBase';
-import CutoffUnmetConnector from 'Wanted/CutoffUnmet/CutoffUnmetConnector';
-import MissingConnector from 'Wanted/Missing/MissingConnector';
 
 function AppRoutes(props) {
   const {
@@ -52,7 +48,7 @@ function AppRoutes(props) {
       <Route
         exact={true}
         path="/"
-        component={AuthorIndexConnector}
+        component={BookIndexConnector}
       />
 
       {
@@ -84,12 +80,6 @@ function AppRoutes(props) {
 
       <Route
         exact={true}
-        path="/shelf"
-        component={BookshelfConnector}
-      />
-
-      <Route
-        exact={true}
         path="/books"
         component={BookIndexConnector}
       />
@@ -110,15 +100,6 @@ function AppRoutes(props) {
       />
 
       {/*
-        Calendar
-      */}
-
-      <Route
-        path="/calendar"
-        component={CalendarPageConnector}
-      />
-
-      {/*
         Activity
       */}
 
@@ -135,20 +116,6 @@ function AppRoutes(props) {
       <Route
         path="/activity/blocklist"
         component={BlocklistConnector}
-      />
-
-      {/*
-        Wanted
-      */}
-
-      <Route
-        path="/wanted/missing"
-        component={MissingConnector}
-      />
-
-      <Route
-        path="/wanted/cutoffunmet"
-        component={CutoffUnmetConnector}
       />
 
       {/*

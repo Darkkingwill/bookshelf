@@ -199,20 +199,6 @@ class MediaManagement extends Component {
 
                       <FormGroup size={sizes.MEDIUM}>
                         <FormLabel>
-                          {translate('AutoConvertToM4b')}
-                        </FormLabel>
-
-                        <FormInputGroup
-                          type={inputTypes.CHECK}
-                          name="autoConvertToM4b"
-                          helpText={translate('AutoConvertToM4bHelpText')}
-                          onChange={onInputChange}
-                          {...settings.autoConvertToM4b}
-                        />
-                      </FormGroup>
-
-                      <FormGroup size={sizes.MEDIUM}>
-                        <FormLabel>
                           {translate('ImportExtraFiles')}
                         </FormLabel>
 
@@ -262,6 +248,34 @@ class MediaManagement extends Component {
                       helpText={translate('AutoUnmonitorPreviouslyDownloadedBooksHelpText')}
                       onChange={onInputChange}
                       {...settings.autoUnmonitorPreviouslyDownloadedBooks}
+                    />
+                  </FormGroup>
+
+                  <FormGroup size={sizes.MEDIUM}>
+                    <FormLabel>
+                      {translate('AutoConvertToM4b')}
+                    </FormLabel>
+
+                    <FormInputGroup
+                      type={inputTypes.CHECK}
+                      name="autoConvertToM4b"
+                      helpText={translate('AutoConvertToM4bHelpText')}
+                      onChange={onInputChange}
+                      {...settings.autoConvertToM4b}
+                    />
+                  </FormGroup>
+
+                  <FormGroup size={sizes.MEDIUM}>
+                    <FormLabel>
+                      {translate('CoverFallback')}
+                    </FormLabel>
+
+                    <FormInputGroup
+                      type={inputTypes.CHECK}
+                      name="coverFallbackEnabled"
+                      helpText={translate('CoverFallbackHelpText')}
+                      onChange={onInputChange}
+                      {...settings.coverFallbackEnabled}
                     />
                   </FormGroup>
 

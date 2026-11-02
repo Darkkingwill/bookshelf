@@ -2,6 +2,7 @@
 // Please do not change this file!
 interface CssExports {
   'clearLookupButton': string;
+  'helpSubText': string;
   'helpText': string;
   'message': string;
   'noResults': string;

@@ -37,8 +37,9 @@ export const defaultState = {
     size: 'large',
     showTitle: true,
     showAuthor: true,
-    showMonitored: true,
-    showQualityProfile: true,
+    // "Monitored" and the quality profile name repeated on every card were noise for an owned-only library
+    showMonitored: false,
+    showQualityProfile: false,
     showSearchAction: false
   },
 

@@ -34,7 +34,7 @@ const columns = [
     name: 'customFormats',
     label: () => translate('CustomFormats'),
     isSortable: false,
-    isVisible: true
+    isVisible: false
   },
   {
     name: 'customFormatScore',
@@ -43,7 +43,7 @@ const columns = [
       title: () => translate('CustomFormatScore')
     }),
     isSortable: true,
-    isVisible: true
+    isVisible: false
   },
   {
     name: 'date',

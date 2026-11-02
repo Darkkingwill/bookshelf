@@ -26,20 +26,16 @@ const links = [
     alias: '/authors',
     children: [
       {
-        title: () => translate('Authors'),
-        to: '/authors'
-      },
-      {
         title: () => translate('Books'),
         to: '/books'
       },
       {
-        title: () => translate('AddNew'),
-        to: '/add/search'
+        title: () => translate('Authors'),
+        to: '/authors'
       },
       {
-        title: () => translate('Bookshelf'),
-        to: '/shelf'
+        title: () => translate('AddNew'),
+        to: '/add/search'
       },
       {
         title: () => translate('UnmappedFiles'),
@@ -48,12 +44,8 @@ const links = [
     ]
   },
 
-  {
-    iconName: icons.CALENDAR,
-    title: () => translate('Calendar'),
-    to: '/calendar'
-  },
-
+  // Calendar, Wanted and Bookshelf are left out of the menu: an owned-only audiobook library has no release calendar
+  // or wanted list, and the routes still exist for anyone who types the address.
   {
     iconName: icons.ACTIVITY,
     title: () => translate('Activity'),
@@ -71,22 +63,6 @@ const links = [
       {
         title: () => translate('Blocklist'),
         to: '/activity/blocklist'
-      }
-    ]
-  },
-
-  {
-    iconName: icons.WARNING,
-    title: () => translate('Wanted'),
-    to: '/wanted/missing',
-    children: [
-      {
-        title: () => translate('Missing'),
-        to: '/wanted/missing'
-      },
-      {
-        title: () => translate('CutoffUnmet'),
-        to: '/wanted/cutoffunmet'
       }
     ]
   },

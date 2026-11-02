@@ -231,27 +231,27 @@ class BookIndexPoster extends Component {
 
           {
             showTitle &&
-              <div className={styles.title}>
+              <div className={styles.bookTitle} title={title}>
                 {title}
               </div>
           }
 
           {
             showAuthor &&
-              <div className={styles.title}>
+              <div className={styles.authorName}>
                 {author.authorName}
               </div>
           }
 
           {
             showMonitored &&
-              <div className={styles.title}>
+              <div className={styles.meta}>
                 {monitored ? 'Monitored' : 'Unmonitored'}
               </div>
           }
 
           {showQualityProfile && !!qualityProfile?.name ? (
-            <div className={styles.title} title={translate('QualityProfile')}>
+            <div className={styles.meta} title={translate('QualityProfile')}>
               {qualityProfile.name}
             </div>
           ) : null}

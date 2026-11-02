@@ -104,7 +104,7 @@ class AddNewItem extends Component {
               className={styles.searchInput}
               name="searchBox"
               value={term}
-              placeholder={translate('SearchBoxPlaceHolder')}
+              placeholder="Search by title or author, for example Project Hail Mary"
               autoFocus={true}
               onChange={this.onSearchInputChange}
             />
@@ -185,12 +185,10 @@ class AddNewItem extends Component {
               null :
               <div className={styles.message}>
                 <div className={styles.helpText}>
-                  {translate('ItsEasyToAddANewAuthorOrBookJustStartTypingTheNameOfTheItemYouWantToAdd')}
+                  Find a book to add
                 </div>
-                <div>
-                  You can also search using the
-                  <Link to="https://goodreads.com"> Goodreads ID </Link>
-                  of a book (e.g. edition:656), work (e.g. work:4912783) or author (e.g. author:128382), the isbn (e.g. isbn:067003469X) or the asin (e.g. asin:B00JCDK5ME)
+                <div className={styles.helpSubText}>
+                  Start typing a title or an author. To jump straight to one book, paste an ISBN or an ASIN, or use a <Link to="https://goodreads.com">Goodreads</Link> id such as work:4912783.
                 </div>
               </div>
           }

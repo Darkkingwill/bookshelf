@@ -15,6 +15,8 @@ function getIconName(name) {
       return icons.HEALTH;
     case 'BookSearch':
       return icons.SEARCH;
+    case 'FindMissingCovers':
+      return icons.IMAGE;
     case 'Housekeeping':
       return icons.HOUSEKEEPING;
     case 'RescanFolders':

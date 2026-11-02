@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import React from 'react';
 import DocumentTitle from 'react-document-title';
 import ErrorBoundary from 'Components/Error/ErrorBoundary';
+import getInstanceName from 'Utilities/getInstanceName';
 import PageContentError from './PageContentError';
 import styles from './PageContent.css';
 
@@ -14,7 +15,7 @@ function PageContent(props) {
 
   return (
     <ErrorBoundary errorComponent={PageContentError}>
-      <DocumentTitle title={title ? `${title} - ${window.Readarr.instanceName}` : window.Readarr.instanceName}>
+      <DocumentTitle title={title ? `${title} - ${getInstanceName()}` : getInstanceName()}>
         <div className={className}>
           {children}
         </div>

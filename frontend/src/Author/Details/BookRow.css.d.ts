@@ -2,6 +2,7 @@
 // Please do not change this file!
 interface CssExports {
   'indexerFlags': string;
+  'length': string;
   'monitored': string;
   'pageCount': string;
   'position': string;

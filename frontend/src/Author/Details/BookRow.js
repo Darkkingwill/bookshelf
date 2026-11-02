@@ -12,6 +12,7 @@ import TableSelectCell from 'Components/Table/Cells/TableSelectCell';
 import TableRow from 'Components/Table/TableRow';
 import Popover from 'Components/Tooltip/Popover';
 import { icons, kinds, tooltipPositions } from 'Helpers/Props';
+import getEstimatedLength from 'Utilities/Book/getEstimatedLength';
 import translate from 'Utilities/String/translate';
 import BookStatus from './BookStatus';
 import styles from './BookRow.css';
@@ -182,6 +183,17 @@ class BookRow extends Component {
                   key={name}
                   date={releaseDate}
                 />
+              );
+            }
+
+            if (name === 'length') {
+              return (
+                <TableRowCell
+                  key={name}
+                  className={styles.length}
+                >
+                  {getEstimatedLength(bookFiles)}
+                </TableRowCell>
               );
             }
 

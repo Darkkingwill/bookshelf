@@ -8,8 +8,6 @@ import * as books from './bookActions';
 import * as bookFiles from './bookFileActions';
 import * as bookHistory from './bookHistoryActions';
 import * as bookIndex from './bookIndexActions';
-import * as bookStudio from './bookshelfActions';
-import * as calendar from './calendarActions';
 import * as captcha from './captchaActions';
 import * as commands from './commandActions';
 import * as customFilters from './customFilterActions';
@@ -28,7 +26,6 @@ import * as series from './seriesActions';
 import * as settings from './settingsActions';
 import * as system from './systemActions';
 import * as tags from './tagActions';
-import * as wanted from './wantedActions';
 
 export default [
   app,
@@ -41,8 +38,6 @@ export default [
   bookHistory,
   bookIndex,
   books,
-  bookStudio,
-  calendar,
   captcha,
   commands,
   customFilters,
@@ -60,6 +55,5 @@ export default [
   series,
   settings,
   system,
-  tags,
-  wanted
+  tags
 ];
