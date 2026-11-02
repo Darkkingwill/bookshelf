@@ -1083,7 +1083,7 @@
   "UpgradeAllowedHelpText": "If disabled qualities will not be upgraded",
   "UpgradesAllowed": "Upgrades Allowed",
   "Uptime": "Uptime",
-  "UrlBaseHelpText": "Adds a prefix to the Calibre url, e.g. http://[host]:[port]/[urlBase]",
+  "UrlBaseHelpText": "Adds a prefix to the URL, e.g. http://[host]:[port]/[urlBase]",
   "UrlBaseHelpTextWarning": "Requires restart to take effect",
   "UseHardlinksInsteadOfCopy": "Use Hardlinks instead of Copy",
   "UseProxy": "Use Proxy",
