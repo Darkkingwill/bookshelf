@@ -19,6 +19,15 @@ on:
       - "src/Readarr.Api.*/openapi.json"
       - "**/*.md"
 
+# Every push to develop/master and every manual run moves the floating `softcover` image tag, so whichever run
+# finishes last owns it. Without this, two merges in quick succession build in parallel and the older commit can
+# finish last and end up as `softcover`. Runs that publish share one queue: a run waits for the one in progress, and
+# a newer waiting run replaces an older waiting one, so the newest commit is always built last. A pull request only
+# builds and tests, so a new push to it cancels its own previous run.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'publish' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   DOTNET_VERSION: "10.0.403"
   READARR_VERSION: "1.0"
