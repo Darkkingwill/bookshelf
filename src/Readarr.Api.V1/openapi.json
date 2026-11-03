@@ -9185,10 +9185,6 @@
             "type": "integer",
             "format": "int32"
           },
-          "calibreId": {
-            "type": "integer",
-            "format": "int32"
-          },
           "part": {
             "type": "integer",
             "format": "int32"
@@ -13039,44 +13035,6 @@
               "format": "int32"
             },
             "nullable": true
-          },
-          "isCalibreLibrary": {
-            "type": "boolean"
-          },
-          "host": {
-            "type": "string",
-            "nullable": true
-          },
-          "port": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "urlBase": {
-            "type": "string",
-            "nullable": true
-          },
-          "username": {
-            "type": "string",
-            "nullable": true
-          },
-          "password": {
-            "type": "string",
-            "nullable": true
-          },
-          "library": {
-            "type": "string",
-            "nullable": true
-          },
-          "outputFormat": {
-            "type": "string",
-            "nullable": true
-          },
-          "outputProfile": {
-            "type": "string",
-            "nullable": true
-          },
-          "useSsl": {
-            "type": "boolean"
           },
           "accessible": {
             "type": "boolean"

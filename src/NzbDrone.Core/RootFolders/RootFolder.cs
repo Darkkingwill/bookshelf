@@ -14,10 +14,6 @@ namespace NzbDrone.Core.RootFolders
         public NewItemMonitorTypes DefaultNewItemMonitorOption { get; set; }
         public HashSet<int> DefaultTags { get; set; } = new ();
 
-        // Left over from the removed Calibre integration. The column is NOT NULL, so the property stays (always false) until a
-        // migration drops the column; nothing reads it.
-        public bool IsCalibreLibrary { get; set; }
-
         public bool Accessible { get; set; }
         public long? FreeSpace { get; set; }
         public long? TotalSpace { get; set; }

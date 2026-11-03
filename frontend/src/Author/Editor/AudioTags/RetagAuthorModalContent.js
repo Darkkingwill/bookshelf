@@ -1,7 +1,6 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import Alert from 'Components/Alert';
-import CheckInput from 'Components/Form/CheckInput';
 import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
 import ModalBody from 'Components/Modal/ModalBody';
@@ -14,34 +13,12 @@ import styles from './RetagAuthorModalContent.css';
 class RetagAuthorModalContent extends Component {
 
   //
-  // Lifecycle
-
-  constructor(props, context) {
-    super(props, context);
-
-    this.state = {
-      updateCovers: false,
-      embedMetadata: false
-    };
-  }
-
-  //
-  // Listeners
-
-  onCheckInputChange = ({ name, value }) => {
-    this.setState({ [name]: value });
-  };
-
-  onRetagAuthorPress = () => {
-    this.props.onRetagAuthorPress(this.state.updateCovers, this.state.embedMetadata);
-  };
-
-  //
   // Render
 
   render() {
     const {
       authorNames,
+      onRetagAuthorPress,
       onModalClose
     } = this.props;
 
@@ -77,41 +54,13 @@ class RetagAuthorModalContent extends Component {
         </ModalBody>
 
         <ModalFooter>
-          <label className={styles.searchForNewBookLabelContainer}>
-            <span className={styles.searchForNewBookLabel}>
-              Update Covers
-            </span>
-
-            <CheckInput
-              containerClassName={styles.searchForNewBookContainer}
-              className={styles.searchForNewBookInput}
-              name="updateCovers"
-              value={this.state.updateCovers}
-              onChange={this.onCheckInputChange}
-            />
-          </label>
-
-          <label className={styles.searchForNewBookLabelContainer}>
-            <span className={styles.searchForNewBookLabel}>
-              Embed Metadata
-            </span>
-
-            <CheckInput
-              containerClassName={styles.searchForNewBookContainer}
-              className={styles.searchForNewBookInput}
-              name="embedMetadata"
-              value={this.state.embedMetadata}
-              onChange={this.onCheckInputChange}
-            />
-          </label>
-
           <Button onPress={onModalClose}>
             Cancel
           </Button>
 
           <Button
             kind={kinds.DANGER}
-            onPress={this.onRetagAuthorPress}
+            onPress={onRetagAuthorPress}
           >
             Retag
           </Button>

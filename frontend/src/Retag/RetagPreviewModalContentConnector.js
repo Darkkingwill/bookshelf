@@ -49,12 +49,10 @@ class RetagPreviewModalContentConnector extends Component {
   //
   // Listeners
 
-  onRetagPress = (files, updateCovers, embedMetadata) => {
+  onRetagPress = (files) => {
     this.props.executeCommand({
       name: commandNames.RETAG_FILES,
       authorId: this.props.authorId,
-      updateCovers,
-      embedMetadata,
       files
     });
 
