@@ -21,10 +21,6 @@ namespace NzbDrone.Core.MediaFiles
         public IndexerFlags IndexerFlags { get; set; }
         public MediaInfoModel MediaInfo { get; set; }
         public int EditionId { get; set; }
-
-        // Left over from the removed Calibre integration. The column is NOT NULL, so the property stays (always 0) until a
-        // migration drops the column; nothing reads it.
-        public int CalibreId { get; set; }
         public int Part { get; set; }
 
         // These are queried from the database

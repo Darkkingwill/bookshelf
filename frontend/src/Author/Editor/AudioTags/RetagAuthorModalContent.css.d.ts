@@ -3,10 +3,6 @@
 interface CssExports {
   'message': string;
   'retagIcon': string;
-  'searchForNewBookContainer': string;
-  'searchForNewBookInput': string;
-  'searchForNewBookLabel': string;
-  'searchForNewBookLabelContainer': string;
 }
 export const cssExports: CssExports;
 export default cssExports;

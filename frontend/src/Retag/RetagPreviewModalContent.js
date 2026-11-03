@@ -37,9 +37,7 @@ class RetagPreviewModalContent extends Component {
       allSelected: false,
       allUnselected: false,
       lastToggled: null,
-      selectedState: {},
-      updateCovers: false,
-      embedMetadata: false
+      selectedState: {}
     };
   }
 
@@ -63,12 +61,8 @@ class RetagPreviewModalContent extends Component {
     });
   };
 
-  onCheckInputChange = ({ name, value }) => {
-    this.setState({ [name]: value });
-  };
-
   onRetagPress = () => {
-    this.props.onRetagPress(this.getSelectedIds(), this.state.updateCovers, this.state.embedMetadata);
+    this.props.onRetagPress(this.getSelectedIds());
   };
 
   //
@@ -151,34 +145,6 @@ class RetagPreviewModalContent extends Component {
                 onChange={this.onSelectAllChange}
               />
           }
-
-          <label className={styles.searchForNewBookLabelContainer}>
-            <span className={styles.searchForNewBookLabel}>
-              Update Covers
-            </span>
-
-            <CheckInput
-              containerClassName={styles.searchForNewBookContainer}
-              className={styles.searchForNewBookInput}
-              name="updateCovers"
-              value={this.state.updateCovers}
-              onChange={this.onCheckInputChange}
-            />
-          </label>
-
-          <label className={styles.searchForNewBookLabelContainer}>
-            <span className={styles.searchForNewBookLabel}>
-              Embed Metadata
-            </span>
-
-            <CheckInput
-              containerClassName={styles.searchForNewBookContainer}
-              className={styles.searchForNewBookInput}
-              name="embedMetadata"
-              value={this.state.embedMetadata}
-              onChange={this.onCheckInputChange}
-            />
-          </label>
 
           <Button
             onPress={onModalClose}
