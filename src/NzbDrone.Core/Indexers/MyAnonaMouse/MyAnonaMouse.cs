@@ -13,7 +13,6 @@ using NLog;
 using NzbDrone.Common.Cache;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
-using NzbDrone.Common.Serializer;
 using NzbDrone.Core.Annotations;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Indexers.Exceptions;
@@ -28,21 +27,87 @@ namespace NzbDrone.Core.Indexers.MyAnonaMouse
         public override DownloadProtocol Protocol => DownloadProtocol.Torrent;
         private IndexerCapabilities Capabilities => SetCapabilities();
 
-        private readonly ICacheManager _cacheManager;
+        // Every search builds a fresh indexer instance, so two of them can finish at the same moment;
+        // this keeps their read-compare-write of the stored session id from interleaving.
+        private static readonly object MamIdLock = new object();
 
-        public MyAnonaMouse(IHttpClient httpClient, IIndexerStatusService indexerStatusService, IConfigService configService, IParsingService parsingService, Logger logger, ICacheManager cacheManager)
+        private readonly ICacheManager _cacheManager;
+        private readonly IIndexerRepository _indexerRepository;
+
+        public MyAnonaMouse(IHttpClient httpClient, IIndexerStatusService indexerStatusService, IConfigService configService, IParsingService parsingService, Logger logger, ICacheManager cacheManager, IIndexerRepository indexerRepository)
             : base(httpClient, indexerStatusService, configService, parsingService, logger)
         {
             _cacheManager = cacheManager;
+            _indexerRepository = indexerRepository;
         }
 
         public Func<IDictionary<string, string>> GetCookies { get; set; }
         public Action<IDictionary<string, string>, DateTime?> CookiesUpdater { get; set; }
 
+        private static bool LooksLikeSessionId(string value)
+        {
+            // Real session ids are hundreds of characters; a short value such as "deleted" is MyAnonaMouse
+            // clearing the cookie, never something to store.
+            return value.IsNotNullOrWhiteSpace() &&
+                   value.Length >= 20 &&
+                   !value.Equals("deleted", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // MyAnonaMouse hands out a new mam_id each time a session is used. The value the user pasted into the
+        // settings is only good until it is replaced, so the replacement has to be stored or the session
+        // "expires" even though nothing is wrong with the account or the IP.
         private void UpdateCookiesInternal(IDictionary<string, string> cookies, DateTime? expiry)
         {
-            // Cookie updating functionality can be implemented here if needed
-            // For now, this is a no-op
+            // A null dictionary is the "forget what you know" signal sent after failures. Nothing is cached
+            // outside the stored settings, so there is nothing to forget.
+            if (cookies == null || !cookies.TryGetValue("mam_id", out var newMamId) || !LooksLikeSessionId(newMamId))
+            {
+                return;
+            }
+
+            if (Definition is not IndexerDefinition definition)
+            {
+                return;
+            }
+
+            var usedMamId = Settings.MamId;
+
+            if (string.Equals(newMamId, usedMamId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            lock (MamIdLock)
+            {
+                // Id 0 is a definition that was never saved (the Test button on a new indexer): remember the
+                // value for the rest of this call only.
+                if (definition.Id > 0)
+                {
+                    var stored = _indexerRepository.Find(definition.Id);
+
+                    if (stored?.Settings is not MyAnonaMouseSettings storedSettings)
+                    {
+                        return;
+                    }
+
+                    // The stored value is no longer the one this request used: the user pasted a different
+                    // session while the search was running (or the Test button was run with an unsaved edit).
+                    // Theirs wins.
+                    if (!string.Equals(storedSettings.MamId, usedMamId, StringComparison.Ordinal))
+                    {
+                        _logger.Debug("MyAnonaMouse issued a new session id, but the stored one has changed since this request started; keeping the stored one.");
+                        return;
+                    }
+
+                    storedSettings.MamId = newMamId;
+                    _indexerRepository.Update(stored);
+                }
+
+                // Later pages of the same search must use the new value too.
+                Settings.MamId = newMamId;
+            }
+
+            _logger.Debug("MyAnonaMouse issued a new session id; saved it for the next request.");
         }
 
         public override IIndexerRequestGenerator GetRequestGenerator()
@@ -242,6 +307,11 @@ namespace NzbDrone.Core.Indexers.MyAnonaMouse
                 throw new IndexerException(indexerResponse, $"Unexpected response header {httpResponse.Headers.ContentType} from indexer request, expected {HttpAccept.Json.Value}");
             }
 
+            // MyAnonaMouse replaces the session id on every authenticated response. Store the new one before
+            // anything below can throw, otherwise a response that is merely empty or odd would still cost the
+            // session.
+            CookiesUpdater?.Invoke(httpResponse.GetCookies(), DateTime.Now.AddDays(30));
+
             var releaseInfos = new List<ReleaseInfo>();
 
             var jsonResponse = JsonConvert.DeserializeObject<MyAnonaMouseResponse>(indexerResponse.Content);
@@ -326,9 +396,6 @@ namespace NzbDrone.Core.Indexers.MyAnonaMouse
                 releaseInfos.Add(release);
             }
 
-            // Update cookies with the updated mam_id value received in the response
-            CookiesUpdater?.Invoke(httpResponse.GetCookies(), DateTime.Now.AddDays(30));
-
             return releaseInfos.ToArray();
         }
 
@@ -398,7 +465,9 @@ namespace NzbDrone.Core.Indexers.MyAnonaMouse
 
         private bool HasUserVip(Dictionary<string, string> cookies)
         {
-            var cacheKey = "myanonamouse_user_class_" + _settings.ToJson().SHA256Hash();
+            // The key must not contain the session id: it changes on every response now, which would turn this
+            // one-hour cache into an extra request per search.
+            var cacheKey = "myanonamouse_user_class_" + _settings.BaseUrl.SHA256Hash();
 
             var userClass = _userClassCache.Get(
                 cacheKey,
@@ -413,6 +482,9 @@ namespace NzbDrone.Core.Indexers.MyAnonaMouse
                     _logger.Debug("Fetching user data: {0}", request.Url.FullUri);
 
                     var response = _httpClient.Execute(request);
+
+                    // This request is authenticated too, so it can be answered with yet another session id.
+                    CookiesUpdater?.Invoke(response.GetCookies(), DateTime.Now.AddDays(30));
 
                     var jsonResponse = JsonConvert.DeserializeObject<MyAnonaMouseUserDataResponse>(response.Content);
 
